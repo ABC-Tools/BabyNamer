@@ -108,7 +108,7 @@
       document.getElementById('input').onsubmit = ev => {
         ev.preventDefault();
         const textField = document.getElementById('question');
-        log('User: ' + textField.value, 'red');
+        log('user: ' + textField.value, 'red');
         socket.send(textField.value);
         textField.value = '';
       };

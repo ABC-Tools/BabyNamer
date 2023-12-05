@@ -8,7 +8,7 @@ services:
     environment:
       - FLASK_DEBUG=1
       - ENV=DEV
-      - OPENAI_API_KEY="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"
+      - OPENAI_API_KEY=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
       # - CLIENT_SECRET=
 
 #  redis:
