@@ -6,7 +6,7 @@ services:
     ports: ['8080:8080']
     volumes: ['.:/app']
     environment:
-      - FLASK_DEBUG=1
+      # - FLASK_DEBUG=1
       - ENV=DEV
       - OPENAI_API_KEY=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
       # - CLIENT_SECRET=

@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: abctools-deployment
+  name: babynamer-deployment
   labels:
-    app: abctools
+    app: babynamer
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: abctools
+      app: babynamer
   template:
     metadata:
       labels:
-        app: abctools
+        app: babynamer
     spec:
       containers:
-      - name: abctools
-        image: us-west1-docker.pkg.dev/sanbeacon-1161/abctools/abctools:latest
+      - name: babynamer
+        image: us-west1-docker.pkg.dev/sanbeacon-1161/abctools/babynamer:latest
         ports:
         - containerPort: 8080

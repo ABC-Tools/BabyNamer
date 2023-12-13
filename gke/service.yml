@@ -2,12 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
     labels:
-        app: abctools
-    name: abctools-svc
+        app: babynamer
+    name: babynamer-svc
 spec:
     ports:
     - port: 80
       targetPort: 8080
     selector:
-        app: abctools
+        app: babynamer
     type: NodePort

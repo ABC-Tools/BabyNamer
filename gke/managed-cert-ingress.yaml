@@ -9,6 +9,6 @@ metadata:
 spec:
   defaultBackend:
     service:
-      name: abctools-svc
+      name: babynamer-svc
       port:
         number: 80
