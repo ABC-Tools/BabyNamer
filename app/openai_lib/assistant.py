@@ -21,7 +21,7 @@ class Assistant:
         )
         self.thread = client.beta.threads.create()
 
-    def send_and_receive(self, user_msg):
+    def send_and_receive(self, user_msg: str) -> str:
         client.beta.threads.messages.create(
             thread_id=self.thread.id,
             role="user",

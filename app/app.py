@@ -2,11 +2,15 @@ import flask
 import socket
 import logging
 
+import openai_lib.prompt as prompt_lib
+import openai_lib.chat_completion as chat_completion
+
 from flask_sock import Sock
 from flask import request, abort, jsonify
 
-from  openai_lib.assistant import Assistant
+from openai_lib.assistant import Assistant
 from lib import name_statistics as ns
+from lib import name_meaning as nm
 
 app = flask.Flask(__name__)
 sock = Sock(app)
@@ -20,30 +24,47 @@ def index():
     return flask.render_template('home.html')
 
 
-@app.route("/get_name_frequency")
+@app.route("/babyname/name_facts")
 def get_name_frequency():
     name = request.args.get('name', default="", type=str)
     gender = request.args.get('gender', default="", type=str)
-    if not name or not gender:
+    if not name:
         abort(400, 'Missing name or gender parameter')
 
-    valid_male_gender = ['male', 'M', 'Male', "MALE"]
-    valid_female_gender = ['female', 'F', 'Female', 'FEMALE']
-    if gender not in valid_male_gender and gender not in valid_female_gender:
+    valid_male_gender = ['male', 'boy']
+    valid_female_gender = ['female', 'girl']
+    if gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
         abort(400, 'Invalid gender: {}'.format(gender))
 
-    if gender in valid_male_gender:
-        canonical_gender = 'M'
-    else:
-        canonical_gender = 'F'
+    trend = ns.NAME_FREQ.get(name, gender)
+    meaning = nm.NAME_MEANING.get(name, gender)
+    output = {
+        'trend': trend,
+        'meaning': meaning
+    }
+    return jsonify(output)
 
-    try:
-        trend = ns.NAME_FREQ.get(name, canonical_gender)
-    except ValueError as e:
-        logging.error('Unable to find trending for: {}, {}'.format(name, canonical_gender))
-        abort(404, 'Unable to find trending for: {}, {}'.format(name, canonical_gender))
 
-    return jsonify(trend)
+@app.route("/babyname/suggest")
+def suggest_names():
+    user_param = {}
+
+    # Parse parameters
+    for key, meta_info in prompt_lib.PARAM_TEMPLATES.items():
+        val = request.args.get(key, default="", type=str)
+        if not val:
+            continue
+
+        user_param[key] = val
+
+    # validate parameters
+    valid, error_msg = prompt_lib.validate_prompt_input(user_param)
+    if not valid:
+        abort(400, error_msg)
+
+    resp_dict = chat_completion.send_and_receive(user_param)
+
+    return jsonify(resp_dict)
 
 
 @sock.route('/echo')

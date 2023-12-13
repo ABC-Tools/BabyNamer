@@ -10,7 +10,7 @@ year_match = re.compile(r'yob(\d{4})\.txt$')
 blank_line = re.compile(r'^\s*$')
 
 output_format = 'gzip'
-json_gzip_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json.gzip'
+json_gzip_filename = '/app/static/name_year_trend.json.gzip'
 json_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json'
 
 

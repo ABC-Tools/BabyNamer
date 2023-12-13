@@ -28,4 +28,10 @@ $ docker inspect -f '{{ .Config.Hostname }}' my-container
 6095273a4e9b
 ```
 
-
+### Force readloading in Python shell
+```commandline
+$ Python
+>>>  
+>>> import tools.babyberry_result_rewriting as brr
+>>> reload(brr)
+```
