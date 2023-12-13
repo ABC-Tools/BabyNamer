@@ -1,37 +1,49 @@
-# python-flask-docker
-Basic Python Flask app in Docker which prints the hostname and IP of the container
+# AI Baby Namer
 
-### Build application
-Build the Docker image manually by cloning the Git repo.
-```
-$ git clone https://github.com/tansan78/youtube-api.git
-$ docker build -t tansan78/youtube-api .
-```
 
-### Run the container
-Create a container from the image.
+## Data source of name frequency
+https://www.ssa.gov/data.json; the exact record is
 ```
-$ docker run --name my-container -d -p 8080:8080 tansan78/youtube-api
-```
-
-Now visit http://localhost:8080
-```
- The hostname of the container is 6095273a4e9b and its IP is 172.17.0.2. 
-```
-
-### Verify the running container
-Verify by checking the container ip and hostname (ID):
-```
-$ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' my-container
-172.17.0.2
-$ docker inspect -f '{{ .Config.Hostname }}' my-container
-6095273a4e9b
+"dataQuality": null,
+"describedBy": "https://www.ssa.gov/oact/babynames/background.html",
+"describedByType": null,
+"description": "The data (name, year of birth, sex, and number) are from a 100 percent sample of Social Security card applications for 1880 onward.",
+"distribution": [
+        {
+          "description": null,
+          "downloadURL": "https://www.ssa.gov/oact/babynames/names.zip",
+          "format": "ZIP",
+          "mediaType": "application/zip",
+          "title": null
+        }
+]
 ```
 
-### Force readloading in Python shell
+## Data source for name meaning
+https://nameberry.com/popular-names/us/all
+
+https://nameberry.com/popular-names/us/girls/all
+
+https://nameberry.com/popular-names/us/boys/all
+
+1. use Scrapy to scrape the data
+2. call ChatGPT to rewrite the content (tools/babyberry_result_rewriting.py)
+
+## Development
+
+### test code using local docker
+```
+$ docker compose up
+$ curl http://127.0.0.1:8080/babyname/name_facts?name=Barbara
+```
+
+### test code in python shell
 ```commandline
-$ Python
->>>  
+$ . venv/bin/activate
+$ sudo Python (sudo is required for disk access)
+>>> from importlib import reload
 >>> import tools.babyberry_result_rewriting as brr
+>>> .... 
+>>> (change babyberry_result_rewriting file)
 >>> reload(brr)
 ```

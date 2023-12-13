@@ -33,7 +33,7 @@ def get_name_frequency():
 
     valid_male_gender = ['male', 'boy']
     valid_female_gender = ['female', 'girl']
-    if gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
+    if gender and gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
         abort(400, 'Invalid gender: {}'.format(gender))
 
     trend = ns.NAME_FREQ.get(name, gender)
