@@ -3,33 +3,19 @@ import openai
 import os
 import json
 
-from typing import Dict
+from typing import Any, Dict, List
 
-import openai_lib.prompt as prompt_lib
+from .prompt import create_user_prompt
 
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(api_key='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')
 
 CONTENT_FORMAT_1 = """"
 Please help the user to name the baby, based on the information provided by user.
-Please only suggest genuine English names. Please provide 10 name proposals in a JSON format.
-{
-  "name 1": "the reason why this is a good name, based on the information provided by user.",
-  "name 2": "the reason why this is a good name, based on the information provided by user.",
-  ...
-}
 """
 
 CONTENT_FORMAT_2 = """
 You are a helpful assistant to suggest names for newborns based on specific information provided by the user.
-Please provide 10 name proposals in a JSON format.
-
-Example response:
-{
-  "name 1": "the reason why this is a good name, based on the information provided by user.",
-  "name 2": "the reason why this is a good name, based on the information provided by user.",
-  ...
-}
 """
 
 
@@ -37,8 +23,8 @@ class InvalidResponse(json.decoder.JSONDecodeError):
     pass
 
 
-def send_and_receive(user_provided_info: Dict[str, str]) -> Dict[str, str]:
-    user_prompt = prompt_lib.create_user_prompt(user_provided_info)
+def send_and_receive(user_prefs: List[Any]) -> Dict[str, str]:
+    user_prompt = create_user_prompt(user_prefs)
     logging.info("User prompt: {}".format(user_prompt))
 
     response = client.with_options(max_retries=5, timeout=60).chat.completions.create(

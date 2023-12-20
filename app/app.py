@@ -11,6 +11,9 @@ from flask import request, abort, jsonify
 from openai_lib.assistant import Assistant
 from lib import name_statistics as ns
 from lib import name_meaning as nm
+from lib import similar_names as sn
+from lib import name_pref as np
+
 
 app = flask.Flask(__name__)
 sock = Sock(app)
@@ -29,7 +32,7 @@ def get_name_frequency():
     name = request.args.get('name', default="", type=str)
     gender = request.args.get('gender', default="", type=str)
     if not name:
-        abort(400, 'Missing name or gender parameter')
+        abort(400, 'Missing name parameter')
 
     valid_male_gender = ['male', 'boy']
     valid_female_gender = ['female', 'girl']
@@ -38,31 +41,32 @@ def get_name_frequency():
 
     trend = ns.NAME_FREQ.get(name, gender)
     meaning = nm.NAME_MEANING.get(name, gender)
+    similar_names = sn.SIMILAR_NAMES.get(name, gender)
     output = {
         'trend': trend,
-        'meaning': meaning
+        'meaning': meaning,
+        'similar_names': similar_names
     }
     return jsonify(output)
 
 
 @app.route("/babyname/suggest")
 def suggest_names():
-    user_param = {}
-
     # Parse parameters
-    for key, meta_info in prompt_lib.PARAM_TEMPLATES.items():
-        val = request.args.get(key, default="", type=str)
+    all_prefs = []
+    for pref_class in np.ALL_PREFERENCES:
+        val = request.args.get(pref_class.get_url_param_name(), default="", type=str)
         if not val:
-            continue
+            if pref_class == np.GenderPref:
+                abort(400, 'Missing name parameter')
+            else:
+                continue
 
-        user_param[key] = val
+        pref = pref_class.create(val)
+        if pref is not None:
+            all_prefs.append(pref)
 
-    # validate parameters
-    valid, error_msg = prompt_lib.validate_prompt_input(user_param)
-    if not valid:
-        abort(400, error_msg)
-
-    resp_dict = chat_completion.send_and_receive(user_param)
+    resp_dict = chat_completion.send_and_receive(all_prefs)
 
     return jsonify(resp_dict)
 

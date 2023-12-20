@@ -1,86 +1,65 @@
-import logging
+from typing import List
 
-from typing import Dict, Tuple
-
-ATTRIBUTE_NAME = "attribute_name"
-REQUIRED_KEY = 'required'
-ALLOWED_VALUES = 'allowed_values'
-TEMPLATE = 'template'
-
-PARAM_TEMPLATES = {
-    'gender': {
-        REQUIRED_KEY: True,
-        ALLOWED_VALUES: ['male', 'female', 'boy', 'girl'],
-        ATTRIBUTE_NAME: 'gender',
-        TEMPLATE: "the baby is {}."
-    },
-    'origin': {
-        REQUIRED_KEY: False,
-        ATTRIBUTE_NAME: 'family origin',
-        TEMPLATE: 'my family comes from the country of {}. Please propose English names only. '
-                  'Ideally, the proposed name has some connection with {}.'
-    },
-    'sibling_name': {
-        REQUIRED_KEY: False,
-        ATTRIBUTE_NAME: "sibling's name",
-        TEMPLATE: "the newborn's sibling has a name of {}. Ideally the proposed name has some connection with {}."
-    },
-    'other': {
-        REQUIRED_KEY: False,
-        ATTRIBUTE_NAME: "other provided information",
-        TEMPLATE: '{}.'
-    }
-}
+import app.lib.name_pref as np
 
 
-def validate_prompt_input(user_param: Dict[str, str]) -> Tuple[bool, str] :
-    # check required parameter
-    for key, meta_info in PARAM_TEMPLATES.items():
-        if key not in user_param:
-            if meta_info.get(REQUIRED_KEY, False):
-                err_msg = 'Missing required param: {}'.format(key)
-                logging.info(err_msg)
-                return False, err_msg
-            else:
-                continue
-
-        val = user_param[key]
-        if ALLOWED_VALUES in meta_info and val not in meta_info[ALLOWED_VALUES]:
-            err_msg = 'Parameter {} allows only value of {}, but get {}'.format(
-                key, meta_info[ALLOWED_VALUES], val)
-            logging.info(err_msg)
-            return False, err_msg
-
-        return True, None
-
-
-def create_user_prompt(user_info: Dict[str, str]) -> str:
-    sentence_list = []
-
-    provided_keys = user_info.keys()
-    if 'sibling_name' in provided_keys:
+def create_user_prompt(user_prefs: List[np.PrefInterface]) -> str:
+    # Create the start of prompt
+    factors = [pref.__class__.get_pref_meaning() for pref in user_prefs]
+    if len(factors) == 0:
         prompt_beginning = 'Suggest English names for a newborn '
     else:
-        prompt_beginning = "Suggest English names for a newborn that complement or" \
-                           "are similar in style or theme to the sibling's name"
+        prompt_beginning = "Suggest good English names for a newborn considering {}.".format(factors.join(', '))
 
-    provided_keys_without_sibling_name = [x for x in provided_keys if x != 'sibling_name']
-    if len(provided_keys_without_sibling_name) > 0:
-        prompt_beginning = '{}, considering {}'.format(
-            prompt_beginning, ' '.join(provided_keys_without_sibling_name))
+    # create the paragraphs for user preferences
+    formatted_prefs = []
+    for pref in user_prefs:
+        if isinstance(pref, np.GenderPref) or isinstance(pref, np.FamilyName) or \
+                isinstance(pref, np.MotherName) or isinstance(pref, np.FatherName) or \
+                isinstance(pref, np.Origin) or isinstance(pref, np.NameStyle):
+            pref_str = '{meaning}: {value}'.format(meaning=pref.__class__.get_pref_meaning(),
+                                                   value=pref.get_val_str())
+            formatted_prefs.append(pref_str)
+        elif isinstance(pref, np.SiblingNames):
+            names_str = pref.get_val().join(', ')
+            pref_str = "{meaning}: {value}. Please suggest names which complement or are similar" \
+                       " in style or theme to these siblings' names".format(
+                            meaning=pref.__class__.get_pref_meaning(), value=names_str)
+            formatted_prefs.append(pref_str)
+        elif isinstance(pref, np.NamesToAvoid):
+            names_str = pref.get_val().join(', ')
+            pref_str = '{meaning}: {value}'.format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
+            formatted_prefs.append(pref_str)
+        elif isinstance(pref, np.NameSentiments):
+            for name, sentiment_dict in pref.get_val().items():
+                if 'reason' in sentiment_dict and sentiment_dict['reason']:
+                    pref_str = '{meaning}: {sentiment} {name}, because {reason}'.format(
+                        meaning=pref.__class__.get_pref_meaning(),
+                        sentiment=str(sentiment_dict['sentiment']),
+                        name=name,
+                        reason=sentiment_dict['reason'])
+                else:
+                    pref_str = '{meaning}: {sentiment} {name}'.format(
+                        meaning=pref.__class__.get_pref_meaning(),
+                        sentiment=str(sentiment_dict['sentiment']),
+                        name=name)
+                formatted_prefs.append(pref_str)
+        else:
+            raise ValueError('Unexpected user preference: {}'.format(pref.__class__.get_url_param_name()))
 
-    for key, val in user_info.items():
-        if key not in PARAM_TEMPLATES.keys():
-            logging.warning('Prompt creation; unexpected key: {} and val: {}'.format(key, val))
-            continue
-
-        template = PARAM_TEMPLATES[key][TEMPLATE]
-        sentence_list.append(template.replace('{}', val))
-
-    user_info_str = ' '.join(sentence_list)
+    user_pref_str = formatted_prefs.join('\n')
 
     return '''
-{prompt_beginning}.
+{prompt_beginning}
+
 {user_info_str}
-Please suggest names without asking questions.
-    '''.format(prompt_beginning=prompt_beginning, user_info_str=user_info_str)
+
+Please suggest names without asking questions. Please provide 10 name proposals in a JSON format.
+
+Example response:
+{
+  "name 1": "the reason why this is a good name, based on the information provided by user.",
+  "name 2": "the reason why this is a good name, based on the information provided by user.",
+  ...
+}
+    '''.format(prompt_beginning=prompt_beginning, user_info_str=user_pref_str)

@@ -5,11 +5,23 @@ services:
     build: .
     ports: ['8080:8080']
     volumes: ['.:/app']
+    links:
+      - redis-server
+    depends_on:
+      - redis-server
     environment:
       - FLASK_DEBUG=1
       - ENV=DEV
       - OPENAI_API_KEY=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
+      - REDISHOST=redis-server
+      - REDISPORT=6379
       # - CLIENT_SECRET=
+
+  redis-server:
+    image: "redis:alpine"
+    command: redis-server
+    ports:
+      - "6379:6379"
 
 #  redis:
 #    image: redis
