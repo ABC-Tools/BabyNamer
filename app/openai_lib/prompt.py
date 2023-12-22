@@ -1,6 +1,6 @@
 from typing import List
 
-import app.lib.name_pref as np
+from ..lib import name_pref as np
 
 
 def create_user_prompt(user_prefs: List[np.PrefInterface]) -> str:
