@@ -2,9 +2,10 @@ import logging
 import openai
 import os
 import json
+import time
 
-from typing import Any, Dict, List
-
+from typing import Dict
+from app.lib import name_pref as np
 from .prompt import create_user_prompt
 
 API_KEY = os.getenv("OPENAI_API_KEY")
@@ -23,10 +24,13 @@ class InvalidResponse(json.decoder.JSONDecodeError):
     pass
 
 
-def send_and_receive(user_prefs: List[Any]) -> Dict[str, str]:
+def send_and_receive(user_prefs: Dict[str, np.PrefInterface]) -> Dict[str, str]:
     user_prompt = create_user_prompt(user_prefs)
+
+    logging.info("system prompt: {}".format(CONTENT_FORMAT_2))
     logging.info("User prompt: {}".format(user_prompt))
 
+    start_ts = int(time.time())
     response = client.with_options(max_retries=5, timeout=60).chat.completions.create(
         model="gpt-3.5-turbo-1106",
         response_format={"type": "json_object"},
@@ -45,7 +49,8 @@ def send_and_receive(user_prefs: List[Any]) -> Dict[str, str]:
     stop_reason = response.choices[0].finish_reason
     if stop_reason != 'stop':
         logging.warning('The stop reason is {}'.format(stop_reason))
-    logging.info('Total used tokens: {}'.format(response.usage.total_tokens))
+    logging.info('Total used tokens: {} and elapse time: {} seconds'.format(
+        response.usage.total_tokens, int(time.time()) - start_ts))
 
     try:
         parsed_rsp = json.loads(response.choices[0].message.content)

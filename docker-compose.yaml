@@ -12,6 +12,7 @@ services:
     environment:
       - FLASK_DEBUG=1
       - ENV=DEV
+      - FLASK_ENV=development  # prevent flask to reload and error out on wrong code
       - OPENAI_API_KEY=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
       - REDISHOST=redis-server
       - REDISPORT=6379
