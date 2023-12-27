@@ -24,8 +24,8 @@ class InvalidResponse(json.decoder.JSONDecodeError):
     pass
 
 
-def send_and_receive(user_prefs: Dict[str, np.PrefInterface]) -> Dict[str, str]:
-    user_prompt = create_user_prompt(user_prefs)
+def send_and_receive(user_prefs: Dict[str, np.PrefInterface], user_sentiments: np.UserSentiments) -> Dict[str, str]:
+    user_prompt = create_user_prompt(user_prefs, user_sentiments)
 
     logging.info("system prompt: {}".format(CONTENT_FORMAT_2))
     logging.info("User prompt: {}".format(user_prompt))

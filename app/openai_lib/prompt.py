@@ -3,10 +3,13 @@ from typing import Dict
 from app.lib import name_pref as np
 
 
-def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface]) -> str:
+def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface],
+                       user_sentiments: np.UserSentiments) -> str:
     user_prefs = user_prefs_dict.values()
     # Create the start of prompt
     factors = [pref.__class__.get_pref_meaning() for pref in user_prefs]
+    if user_sentiments:
+        factors.append(np.UserSentiments.get_pref_meaning())
     if len(factors) == 0:
         prompt_beginning = 'Suggest English names for a newborn.'
     else:
@@ -38,37 +41,38 @@ def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface]) -> str:
             names_str = ', '.join(pref.get_val())
             pref_str = '{meaning}: {value}.'.format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
             formatted_prefs.append(pref_str)
-        elif isinstance(pref, np.NameSentiments):
-            liked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
-                             'Please recommend a few names similar to {name} if possible.'
-            disliked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
-                                'Please do not recommend names similar to {name} if possible.'
-            saved_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
-                             'Please recommend a few more names similar to {name}.'
-            for name, sentiment_dict in pref.get_val().items():
-                if sentiment_dict['sentiment'] == np.Sentiment.LIKED:
-                    template = liked_template
-                elif sentiment_dict['sentiment'] == np.Sentiment.DISLIKED:
-                    template = disliked_template
-                elif sentiment_dict['sentiment'] == np.Sentiment.SAVED:
-                    template = saved_template
-                else:
-                    raise ValueError('Unexpected sentiment: {}'.format(sentiment_dict['sentiment']))
-
-                if 'reason' in sentiment_dict and sentiment_dict['reason']:
-                    reason_clause = ', because {}'.format(sentiment_dict['reason'])
-                else:
-                    reason_clause = ''
-
-                pref_str = template.format(
-                    meaning=pref.__class__.get_pref_meaning(),
-                    sentiment=str(sentiment_dict['sentiment']),
-                    name=name,
-                    reason_clause=reason_clause)
-
-                formatted_prefs.append(pref_str)
         else:
             raise ValueError('Unexpected user preference: {}'.format(pref.__class__.get_url_param_name()))
+
+    if user_sentiments:
+        liked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
+                         'Please recommend a few names similar to {name} if possible.'
+        disliked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
+                            'Please do not recommend names similar to {name} if possible.'
+        saved_template = '{meaning}: user {sentiment} the name of {name} as a favorite{reason_clause}. ' \
+                         'Please recommend a few more names similar to {name}.'
+        for name, sentiment_dict in user_sentiments.get_val().items():
+            if sentiment_dict['sentiment'] == np.Sentiment.LIKED:
+                template = liked_template
+            elif sentiment_dict['sentiment'] == np.Sentiment.DISLIKED:
+                template = disliked_template
+            elif sentiment_dict['sentiment'] == np.Sentiment.SAVED:
+                template = saved_template
+            else:
+                raise ValueError('Unexpected sentiment: {}'.format(sentiment_dict['sentiment']))
+
+            if 'reason' in sentiment_dict and sentiment_dict['reason']:
+                reason_clause = ', because {}'.format(sentiment_dict['reason'])
+            else:
+                reason_clause = ''
+
+            pref_str = template.format(
+                meaning=user_sentiments.__class__.get_pref_meaning(),
+                sentiment=str(sentiment_dict['sentiment']),
+                name=name,
+                reason_clause=reason_clause)
+
+            formatted_prefs.append(pref_str)
 
     user_pref_str = '\n'.join(formatted_prefs)
 
@@ -77,7 +81,7 @@ def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface]) -> str:
 
 {user_info_str}
 
-Please suggest names without asking questions. Please provide 20 name proposals in a JSON format.
+Please suggest names without asking questions. Please provide 10 name proposals in a JSON format.
 
 Example response:
 {{

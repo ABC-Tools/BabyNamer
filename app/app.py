@@ -35,14 +35,11 @@ def handle_error(e):
     return jsonify(error=str(e)), code
 
 
-@app.route("/")
-def index():
-    return flask.render_template('home.html')
-
-
 @app.route("/babyname/name_facts")
 def get_name_facts():
     """
+    note all keys in the response json may be missing
+
     :return: a json object like
     {
         "meaning": "The name George is typically used as a nickname for names such as ...",
@@ -55,6 +52,11 @@ def get_name_facts():
             "1880": "26",
             ...
             "2021": "7"
+        },
+        "recommend_reason": "the name sounds great",
+        "name_sentiments": {
+            "sentiment": "disliked",
+            "reason": "my neighbor uses this name"
         }
     }
     """
@@ -83,15 +85,30 @@ def get_name_facts():
     }
 
     # get last recommendation reason if there is one
-    last_name_proposals = redis_lib.get_name_proposals(session_id)
-    if last_name_proposals and name in last_name_proposals and last_name_proposals[name]:
-        output['recommend_reason'] = last_name_proposals[name]
+    proposal_reason = redis_lib.get_proposal_for_name(session_id, name)
+    if proposal_reason:
+        output['recommend_reason'] = proposal_reason
+
+    # get sentiment if there is any
+    sentiment_dict = redis_lib.get_sentiment_for_name(session_id, name)
+    if sentiment_dict:
+        output[np.UserSentiments.get_url_param_name()] = sentiment_dict
 
     return jsonify(output)
 
 
 @app.route("/babyname/suggest")
 def suggest_names():
+    """
+    URL parameters:
+    - any URL parameters which are accepted by update_user_pref()
+    - any URL parameters which are accepted by update_user_sentiments
+    :return: name proposals
+    {
+        "Mike": "the name has a close relationship with China, ..."
+        "John": "the name resonate well with George. ..."
+    }
+    """
     session_id = request.args.get('session_id', default="", type=str)
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
@@ -102,24 +119,18 @@ def suggest_names():
         proposal_dict = redis_lib.get_name_proposals(session_id)
         return jsonify(proposal_dict)
 
-    # Parse preferences parameters
-    all_prefs = {}
-    for pref_class in np.ALL_PREFERENCES:
-        val = request.args.get(pref_class.get_url_param_name(), default="", type=str)
-        if not val:
-            continue
-        all_prefs[pref_class.get_url_param_name()] = val
+    # update user preferences
+    update_user_pref()
 
-    # Parse preferences
-    parsed_prefs = np.str_dict_to_class_dict(all_prefs)
-    # update the preferences in redis first
-    redis_lib.update_user_pref(session_id, parsed_prefs)
+    # Update user sentiments
+    update_user_sentiments(raise_on_missing_param=False)
 
-    # Fetch all preferences from redis
-    all_prefs = redis_lib.get_user_pref(session_id)
+    # Fetch all preferences and sentiments from redis
+    user_prefs = redis_lib.get_user_pref(session_id)
+    user_sentiments = redis_lib.get_user_sentiments(session_id)
 
     # Fetch proposals from ChatGPT
-    resp_dict = chat_completion.send_and_receive(all_prefs)
+    resp_dict = chat_completion.send_and_receive(user_prefs, user_sentiments)
 
     # Write a copy in redis for late references
     redis_lib.update_name_proposals(session_id, resp_dict)
@@ -127,8 +138,21 @@ def suggest_names():
     return jsonify(resp_dict)
 
 
-@app.route("/babyname/update_pref")
-def update_pref():
+@app.route("/babyname/update_user_pref")
+def update_user_pref():
+    """
+    URL parameters:
+        - session_id:
+        - gender: boy/girl,
+        - family_name: Tan
+        - mother_name: Amy
+        - father_name: Sam
+        - sibling_names: ["Kaitlyn", "George"]
+        - origin: China
+        - names_to_avoid: ["Mike", "Allen"]
+        - other: "whatever the user writes"
+    :return:
+    """
     session_id = request.args.get('session_id', default="", type=str)
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
@@ -142,25 +166,21 @@ def update_pref():
         all_prefs[pref_class.get_url_param_name()] = val
 
     parsed_prefs = np.str_dict_to_class_dict(all_prefs)
-
     redis_lib.update_user_pref(session_id, parsed_prefs)
 
     return json.dumps({"msg": "success"})
 
 
-@app.route("/babyname/get_pref")
-def get_pref():
+@app.route("/babyname/get_user_pref")
+def get_user_pref():
     """
+    required URL parameter is session id
+
     :return: a dictionary like
     {
         'gender': 'boy',
         'names_to_avoid': '["George", "Mike", ...]' <-- the value is a dictionary
         ...,
-        'name_sentiments': {
-            "Aron": {"sentiment": "liked", "reason": "sounds good"},
-            "Jasper": {"sentiment": "disliked", "reason": "my neighbor uses this name"},
-            "Jayden": {"sentiment": "saved"}
-        }
     }
     """
     session_id = request.args.get('session_id', default="", type=str)
@@ -172,9 +192,38 @@ def get_pref():
     return json.dumps(native_prefs)
 
 
+@app.route("/babyname/update_user_sentiments")
+def update_user_sentiments(raise_on_missing_param=True):
+    """
+    expect an input JSON like
+    {
+        "Aron": {"sentiment": "liked", "reason": "sounds good"},
+        "Jasper": {"sentiment": "disliked", "reason": "my neighbor uses this name"},
+        "Jayden": {"sentiment": "saved"}
+    }
+    :return: success
+    """
+    session_id = request.args.get('session_id', default="", type=str)
+    if not session_id or not sid.verify_session_id(session_id):
+        abort(400, "missing or invalid session id: {}".format(session_id))
+
+    sentiments_str = request.args.get(np.UserSentiments.get_url_param_name(), default="", type=str)
+    if not sentiments_str:
+        if raise_on_missing_param:
+            abort(400, "missing user sentiments in request")
+        else:
+            return "success"
+
+    sentiments_inst = np.UserSentiments.create(sentiments_str)
+    redis_lib.update_user_sentiments(session_id, sentiments_inst)
+    return "success"
+
+
 @app.route("/babyname/get_name_sentiments")
 def get_name_sentiments():
     """
+    required URL parameter is session id
+
     :return: a dictionary like
     {
         "liked": [
@@ -203,7 +252,7 @@ def get_name_sentiments():
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
 
-    name_sentiments = redis_lib.get_name_sentiments(session_id)
+    name_sentiments = redis_lib.get_user_sentiments(session_id)
     if not name_sentiments:
         return {}
 
@@ -212,6 +261,10 @@ def get_name_sentiments():
 
 
 if os.environ.get("ENV") == "DEV":
+    @app.route("/")
+    def index():
+        return flask.render_template('home.html')
+
     @app.route("/babyname/create_sid")
     def create_sid():
         logging.info("test")
