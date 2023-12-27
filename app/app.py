@@ -72,7 +72,7 @@ def get_name_facts():
     if gender and gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
         abort(400, 'Invalid gender: {}'.format(gender))
 
-    trend = ns.NAME_FREQ.get(name, gender)
+    trend = ns.YEAR_TREND.get(name, gender)
     meaning = nm.NAME_MEANING.get(name, gender)
     similar_names = sn.SIMILAR_NAMES.get(name, gender)
 

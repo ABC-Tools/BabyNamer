@@ -47,3 +47,6 @@ $ sudo Python (sudo is required for disk access)
 >>> (change babyberry_result_rewriting file)
 >>> reload(brr)
 ```
+
+### Python type cheat sheet
+https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html

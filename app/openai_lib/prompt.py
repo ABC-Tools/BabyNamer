@@ -21,21 +21,18 @@ def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface]) -> str:
                                                     value=pref.get_val_str())
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.FamilyName):
-            pref_str = '{meaning}: {value}. Please suggest a few names which complement the {meaning}.' \
-                .replace('{meaning}', pref.__class__.get_pref_meaning()) \
-                .replace('{value}', pref.get_val_str())
+            pref_str = '{meaning}: {value}. Please suggest a few names which complement the {meaning}.'\
+                .format(meaning=pref.__class__.get_pref_meaning(), value=pref.get_val_str())
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.Origin):
-            pref_str = '{meaning}: {value}. Please suggest a few names which has the connection with {value}.' \
-                .replace('{meaning}', pref.__class__.get_pref_meaning()) \
-                .replace('{value}', pref.get_val_str())
+            pref_str = '{meaning}: {value}. Please suggest a few names which has the connection with {value}.'\
+                .format(meaning=pref.__class__.get_pref_meaning(), value=pref.get_val_str())
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.SiblingNames):
             names_str = ', '.join(pref.get_val())
             pref_str = "{meaning}: {value}. Please suggest a few names which complement or are similar" \
                        " in style or theme to these {meaning}." \
-                .replace('{meaning}', pref.__class__.get_pref_meaning()) \
-                .replace('{value}', names_str)
+                .format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.NamesToAvoid):
             names_str = ', '.join(pref.get_val())
@@ -63,10 +60,11 @@ def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface]) -> str:
                 else:
                     reason_clause = ''
 
-                pref_str = template.replace('{meaning}', pref.__class__.get_pref_meaning())\
-                    .replace('{sentiment}', str(sentiment_dict['sentiment']))\
-                    .replace('{name}', name)\
-                    .replace('{reason_clause}', reason_clause)
+                pref_str = template.format(
+                    meaning=pref.__class__.get_pref_meaning(),
+                    sentiment=str(sentiment_dict['sentiment']),
+                    name=name,
+                    reason_clause=reason_clause)
 
                 formatted_prefs.append(pref_str)
         else:

@@ -10,7 +10,7 @@ year_match = re.compile(r'yob(\d{4})\.txt$')
 blank_line = re.compile(r'^\s*$')
 
 output_format = 'gzip'
-json_gzip_filename = '/app/static/name_year_trend.json.gzip'
+json_gzip_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json.gzip'
 json_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json'
 
 
@@ -73,11 +73,11 @@ def convert_files():
     if output_format == 'gzip':
         with gzip.open(json_gzip_filename, 'w') as fout:
             fout.write(
-                json.dumps(sorted(name_list, key=lambda x: x['name']), sort_keys=True)
+                json.dumps(sorted(name_list, key=lambda x: x['name']))
                     .encode('utf-8'))
     else:
         with open(json_filename, 'w') as fout:
-            json.dump(sorted(name_list, key=lambda x: x['name']), fout, sort_keys=True)
+            json.dump(sorted(name_list, key=lambda x: x['name']), fout)
 
 
 def read_output_file():
