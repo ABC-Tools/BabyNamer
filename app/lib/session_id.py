@@ -1,4 +1,8 @@
+"""
+A session id which is used for verification.
 
+random_7_digs + str(((random_7_digs * 643) mod 97832) * 245)
+"""
 
 import random
 
