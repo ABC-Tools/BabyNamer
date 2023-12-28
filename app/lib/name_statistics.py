@@ -38,6 +38,22 @@ class NameStatistics:
         top_records = self._name_ordered_list_3_year[gender][0:count]
         return [x['name'] for x in top_records]
 
+    def get_percentile(self, percentile, gender: Gender):
+        total = 0
+        for record in self._name_ordered_list_3_year[gender]:
+            total += record['freq']
+
+        names = []
+        count = 0
+        for record in self._name_ordered_list_3_year[gender]:
+            count += record['freq']
+            names.append(record['name'])
+            if 1.0 * count / total >= percentile:
+                break
+
+        logging.debug('{} of names has a count of {} out of {}: {}'.format(len(names), count, total, names))
+        return names
+
     def get_yearly_trend(self, raw_name: str, raw_gender: str = None) -> Dict[str, str]:
         """
         return a dict with year as key and with frequency as value
