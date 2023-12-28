@@ -41,17 +41,10 @@ push_latest:
 		   ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest
 	docker push ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest
 
-release_dryrun:
-	echo "docker pull ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:${GIT_HASH}"
-	echo "docker tag  ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:${GIT_HASH} \
-		   ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest"
-	echo "docker push ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest"
-
-release:
-	docker pull ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:${GIT_HASH}
-	docker tag  ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:${GIT_HASH} \
-		   ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest
-	docker push ${GCP_ARTIFACT_REG_HOST}/${GCP_PROJECT}/${GCP_ARTIFACT_REG_DIR}/${APPLICATION_NAME}:latest
+run_latest_image:
+	kubectl scale deployment babynamer-deployment --replicas=0
+	kubectl scale deployment babynamer-deployment --replicas=1
+	# kubectl rollout restart deployment/babynamer-deployment
 
 # need gcloud and gke-gcloud-auth-plugin (gcloud components install gke-gcloud-auth-plugin)
 gke_auth:

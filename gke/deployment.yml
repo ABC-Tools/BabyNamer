@@ -17,5 +17,6 @@ spec:
       containers:
       - name: babynamer
         image: us-west1-docker.pkg.dev/sanbeacon-1161/abctools/babynamer:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080

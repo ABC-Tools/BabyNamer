@@ -35,6 +35,11 @@ def handle_error(e):
     return jsonify(error=str(e)), code
 
 
+@app.route("/")
+def index():
+    return flask.render_template('home.html')
+
+
 @app.route("/babyname/name_facts")
 def get_name_facts():
     """
@@ -261,39 +266,37 @@ def get_name_sentiments():
 
 
 if os.environ.get("ENV") == "DEV":
-    @app.route("/")
-    def index():
-        return flask.render_template('home.html')
-
     @app.route("/babyname/create_sid")
     def create_sid():
         logging.info("test")
         return sid.create_session_id()
 
-    @sock.route('/echo')
-    def echo(sock):
-        logging.info('start socket')
-        assistant = Assistant()
 
-        try:
-            while True:
-                data = sock.receive()
+@sock.route('/echo')
+def echo(sock):
+    logging.info('start socket')
+    assistant = Assistant()
 
-                sock.send("Baby Namer is thinking... ")
-                msg = assistant.send_and_receive(data)
-                sock.send('Assistant: ' + msg)
-        except Exception as e:
-            logging.exception(e, exc_info=True)
-            raise e
+    try:
+        while True:
+            data = sock.receive()
 
-    @app.route("/list_ip")
-    def list_ip():
-        try:
-            host_name = socket.gethostname()
-            host_ip = socket.gethostbyname(host_name)
-            return flask.render_template('index.html', host_name, host_ip)
-        except:
-            return flask.render_template('error.html')
+            sock.send("Baby Namer is thinking... ")
+            msg = assistant.send_and_receive(data)
+            sock.send('Assistant: ' + msg)
+    except Exception as e:
+        logging.exception(e, exc_info=True)
+        raise e
+
+
+@app.route("/list_ip")
+def list_ip():
+    try:
+        host_name = socket.gethostname()
+        host_ip = socket.gethostbyname(host_name)
+        return flask.render_template('index.html', host_name, host_ip)
+    except:
+        return flask.render_template('error.html')
 
 
 if __name__ == "__main__":
