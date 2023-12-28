@@ -73,7 +73,7 @@ def loaded_list_to_dict(name_list):
         val_dict = name_dict[raw_name]
 
         name = common_lib.canonicalize_name(raw_name)
-        gender = common_lib.canonicalize_gender(val_dict.get('gender', ''))
+        gender = common_lib.canonicalize_gender(val_dict.get_yearly_trend('gender', ''))
 
         # this is only for dedup; therefore the content does not matter
         result[(name, gender)] = {}
@@ -101,7 +101,7 @@ def rewrite_babyberry_data():
             val_dict = input_dict[raw_name]
 
             name = common_lib.canonicalize_name(raw_name)
-            raw_gender = val_dict.get('gender', '')
+            raw_gender = val_dict.get_yearly_trend('gender', '')
             gender = common_lib.canonicalize_gender(raw_gender)
 
             # skip if it has been rewritten before

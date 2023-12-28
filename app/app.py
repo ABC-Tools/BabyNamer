@@ -1,4 +1,6 @@
 import json
+from collections import OrderedDict
+
 from werkzeug.exceptions import HTTPException
 
 import flask
@@ -20,6 +22,7 @@ from app.lib import name_pref as np
 from app.lib import session_id as sid
 
 app = flask.Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
 sock = Sock(app)
 
 SCHEMA_HOST = "http://localhost"
@@ -79,9 +82,9 @@ def get_name_facts():
     if gender and gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
         abort(400, 'Invalid gender: {}'.format(gender))
 
-    trend = ns.YEAR_TREND.get(name, gender)
-    meaning = nm.NAME_MEANING.get(name, gender)
-    similar_names = sn.SIMILAR_NAMES.get(name, gender)
+    trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
+    meaning = nm.NAME_MEANING.get_yearly_trend(name, gender)
+    similar_names = sn.SIMILAR_NAMES.get_yearly_trend(name, gender)
 
     output = {
         'trend': trend,
@@ -106,6 +109,12 @@ def get_name_facts():
 def suggest_names():
     """
     URL parameters:
+    - session_id
+    - source: default / popularity_ranking / cached / chatgpt
+        -- default: let system decides
+        -- popularity_ranking: based on last 3 years ranking of names; this is very fast
+        -- cache: fetch from latest suggestions made by ChatGPT
+        - chatgpt: fetch from chatgpt; this usually takes 20+ seconds
     - any URL parameters which are accepted by update_user_pref()
     - any URL parameters which are accepted by update_user_sentiments
     :return: name proposals
@@ -118,11 +127,20 @@ def suggest_names():
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
 
-    # if no refresh and there is proposal available, return last proposal
-    proposal_refresh_strategy = request.args.get('proposal_refresh', default="", type=str)
-    if proposal_refresh_strategy.lower() in ['no_refresh'] and redis_lib.get_last_proposal_time() > 0:
+    # suggestion from SSA popularity data or cache
+    source = request.args.get('source', default="", type=str)
+    cache_ts = redis_lib.get_last_proposal_time(session_id)
+    if (source.lower() in ['cache'] and cache_ts) or \
+            (source.lower() in ['default'] and cache_ts > redis_lib.get_last_pref_update_time(session_id)):
         proposal_dict = redis_lib.get_name_proposals(session_id)
         return jsonify(proposal_dict)
+    elif source.lower() in ['popularity_ranking']:
+        gender = request.args.get(np.GenderPref.get_url_param_name(), default="", type=str)
+        top_names = ns.NAME_STATISTICS.get_popular_names(gender)
+        resp_dict = OrderedDict()
+        for i, name in enumerate(top_names):
+            resp_dict[name] = 'Ranked {} most popular names in the past 3 years'.format(i + 1)
+        return jsonify(resp_dict)
 
     # update user preferences
     update_user_pref()
@@ -169,6 +187,8 @@ def update_user_pref():
         if not val:
             continue
         all_prefs[pref_class.get_url_param_name()] = val
+    if not all_prefs:
+        return json.dumps({"msg": "success; no-op"})
 
     parsed_prefs = np.str_dict_to_class_dict(all_prefs)
     redis_lib.update_user_pref(session_id, parsed_prefs)
@@ -217,11 +237,11 @@ def update_user_sentiments(raise_on_missing_param=True):
         if raise_on_missing_param:
             abort(400, "missing user sentiments in request")
         else:
-            return "success"
+            return json.dumps({"msg": "success; no-op"})
 
     sentiments_inst = np.UserSentiments.create(sentiments_str)
     redis_lib.update_user_sentiments(session_id, sentiments_inst)
-    return "success"
+    return json.dumps({"msg": "success"})
 
 
 @app.route("/babyname/get_name_sentiments")

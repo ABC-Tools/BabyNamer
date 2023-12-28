@@ -59,7 +59,7 @@ class SimilarNames:
 
     @staticmethod
     def get_source_file():
-        return os.path.join(get_app_root_dir(), 'static', 'similar_names.json')
+        return os.path.join(get_app_root_dir(), 'data', 'similar_names.json')
 
 
 SIMILAR_NAMES = SimilarNames()

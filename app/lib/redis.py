@@ -157,12 +157,12 @@ def get_proposal_for_name(session_id, name) -> str:
 
 
 def get_last_pref_update_time(session_id) -> int:
-    last_ts = redis.zscore(LAST_PREF_UPDATE_TS_KEY, session_id)
+    last_ts = redis_client.zscore(LAST_PREF_UPDATE_TS_KEY, session_id)
     return last_ts if last_ts else 0
 
 
 def get_last_proposal_time(session_id) -> int:
-    last_ts = redis.zscore(LAST_PROPOSAL_TS_KEY, session_id)
+    last_ts = redis_client.zscore(LAST_PROPOSAL_TS_KEY, session_id)
     return last_ts if last_ts else 0
 
 
