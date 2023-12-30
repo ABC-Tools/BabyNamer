@@ -20,6 +20,7 @@ from app.lib import name_meaning as nm
 from app.lib import similar_names as sn
 from app.lib import name_pref as np
 from app.lib import session_id as sid
+from app.lib import origin_and_short_meaning as osm
 
 app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -50,10 +51,12 @@ def get_name_facts():
 
     :return: a json object like
     {
+        "origin": "Hebrew",
+        "short_meaning": "Rest, Peace"
         "meaning": "The name George is typically used as a nickname for names such as ...",
         "similar_names":[
-            "gudren",
-            "guinevieve",
+            "Liam",
+            "Elijah",
             ...
         ],
         "trend":{
@@ -82,14 +85,17 @@ def get_name_facts():
     if gender and gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
         abort(400, 'Invalid gender: {}'.format(gender))
 
+    origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
     trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
-    meaning = nm.NAME_MEANING.get_yearly_trend(name, gender)
-    similar_names = sn.SIMILAR_NAMES.get_yearly_trend(name, gender)
+    meaning = nm.NAME_MEANING.get(name, gender)
+    similar_names = sn.SIMILAR_NAMES.get(name, gender)
 
     output = {
-        'trend': trend,
+        'origin': origin,
+        'short_meaning': short_meaning,
         'meaning': meaning,
-        'similar_names': similar_names
+        'similar_names': similar_names,
+        'trend': trend
     }
 
     # get last recommendation reason if there is one

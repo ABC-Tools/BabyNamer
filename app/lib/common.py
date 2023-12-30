@@ -14,7 +14,9 @@ class Gender(Enum):
         return f'{self.name}'.lower()
 
 
-def canonicalize_name(name: str):
+def canonicalize_name(raw_name: str):
+    name = raw_name.strip()
+    name = ''.join([i for i in name if i.isalpha()])
     return name.lower().capitalize()
 
 

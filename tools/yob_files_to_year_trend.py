@@ -10,8 +10,8 @@ year_match = re.compile(r'yob(\d{4})\.txt$')
 blank_line = re.compile(r'^\s*$')
 
 output_format = 'gzip'
-json_gzip_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json.gzip'
-json_filename = '/Users/santan/gitspace/BabyNamer/app/static/name_year_trend.json'
+json_gzip_filename = '/Users/santan/gitspace/BabyNamer/app/data/name_year_trend.json.gzip'
+json_filename = '/Users/santan/gitspace/BabyNamer/app/data/name_year_trend.json'
 
 
 def load_single_file(file_path: str, result: Dict[str, List[Dict[str, str]]]):

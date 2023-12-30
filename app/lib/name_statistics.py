@@ -15,10 +15,14 @@ class NameStatistics:
             NameStatistics.create_name_freq_rank(self.__freq__, 2020, 2022)
 
     def guess_gender(self, name: str):
+        name = canonicalize_name(name)
         boy_count = self._name_freq_3_year[Gender.BOY].get(name, {}).get('freq', 0)
         girl_count = self._name_freq_3_year[Gender.GIRL].get(name, {}).get('freq', 0)
 
-        return Gender.GIRL if girl_count >= boy_count else Gender.BOY
+        guess_gender = Gender.GIRL if girl_count >= boy_count else Gender.BOY
+        logging.debug('name {} guess gender: {}, Girl count: {}, Boy count: {}'.format(
+            name, str(guess_gender), girl_count, boy_count))
+        return guess_gender
 
     def get_frequency_and_rank(self, raw_name: str, raw_gender: str = None):
         name = canonicalize_name(raw_name)
@@ -134,7 +138,7 @@ class NameStatistics:
                 if record['freq'] > 0:
                     freq_dict[gender][name] = record
                     count += 1
-        logging.debug('{} records has non-zero frequency'.format(count))
+        logging.debug('name_statistics: {} records has non-zero frequency'.format(count))
 
         raw_freq_list = {
             Gender.GIRL: [],
@@ -153,9 +157,9 @@ class NameStatistics:
         # write rank  into freq_dict
         for gender in [Gender.GIRL, Gender.BOY]:
             rank = 1
-            for record in freq_list[Gender.GIRL]:
+            for record in freq_list[gender]:
                 name = record['name']
-                freq_dict[gender][name] = rank
+                freq_dict[gender][name]['rank'] = rank
                 rank += 1
 
         return freq_dict, freq_list

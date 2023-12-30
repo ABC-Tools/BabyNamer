@@ -2,6 +2,10 @@
 The information scraped from https://nameberry.com/popular-names/nameberry/boys/all is not well organized,
 because there is no easy to convert HTML (which is visual) into well-formatted text.
 We use ChatGpt to convert fragmented text (usually in a list) into a paragraph.
+
+Two input files:
+- /Users/santan/Downloads/nameberry/parse_results.json
+- /Users/santan/Downloads/babynames/babynames_meaning.json
 """
 
 import openai
@@ -32,7 +36,7 @@ respect it. Otherwise, please make a best guess of the gender.
             {
                 "role": "system",
                 "content": "You are a good assistant to rewrite the meaning and the origin of baby names, "
-                           "based on provided JSON content."
+                           "based on provided content."
             },
             {
                 "role": "user",
