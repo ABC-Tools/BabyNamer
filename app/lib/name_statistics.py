@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from typing import Dict
+from typing import Dict, Union
 from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir
 
 
@@ -20,8 +20,8 @@ class NameStatistics:
         girl_count = self._name_freq_3_year[Gender.GIRL].get(name, {}).get('freq', 0)
 
         guess_gender = Gender.GIRL if girl_count >= boy_count else Gender.BOY
-        logging.debug('name {} guess gender: {}, Girl count: {}, Boy count: {}'.format(
-            name, str(guess_gender), girl_count, boy_count))
+        # logging.debug('name {} guess gender: {}, Girl count: {}, Boy count: {}'.format(
+        #     name, str(guess_gender), girl_count, boy_count))
         return guess_gender
 
     def get_frequency_and_rank(self, raw_name: str, raw_gender: str = None):
@@ -33,8 +33,11 @@ class NameStatistics:
         return self._name_freq_3_year[gender].get(name, {}).get('freq', 0), \
                self._name_freq_3_year[gender].get(name, {}).get('rank', 10000)
 
-    def get_popular_names(self, raw_gender: str, count=30):
-        gender = canonicalize_gender(raw_gender)
+    def get_popular_names(self, raw_gender: Union[str, Gender], count=30):
+        if isinstance(raw_gender, Gender):
+            gender = raw_gender
+        else:
+            gender = canonicalize_gender(raw_gender)
         if not gender:
             raise ValueError('Wrong gender: {}'.format(raw_gender))
 

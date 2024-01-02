@@ -8,6 +8,10 @@ __pycache__/
 # C extensions
 *.so
 
+# big files
+name_embedding-boy.txt
+name_embedding-girl.txt
+
 # Distribution / packaging
 .Python
 build/

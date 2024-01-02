@@ -4,6 +4,7 @@ import datetime
 import os
 
 from enum import Enum
+from typing import Union
 
 
 class Gender(Enum):
@@ -20,7 +21,10 @@ def canonicalize_name(raw_name: str):
     return name.lower().capitalize()
 
 
-def canonicalize_gender(gender: str):
+def canonicalize_gender(gender: Union[str, Gender]):
+    if isinstance(gender, Gender):
+        return gender
+
     if not gender or gender.lower() in ['none']:
         return None
 
@@ -44,3 +48,11 @@ def get_app_root_dir():
     return os.path.dirname(                         # app
         os.path.dirname(os.path.abspath(__file__))  # app/lib
     )
+
+
+def percentage_to_float(x: str):
+    return float(x.strip().strip('%')) / 100
+
+
+def float_to_percentage(x: float, min_val=0):
+    return "{}%".format(max(min_val, round(x * 100)))

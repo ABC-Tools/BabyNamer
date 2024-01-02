@@ -170,4 +170,4 @@ def percentage_to_float(x: str):
 
 
 def float_to_percentage(x: float):
-    return "{}%".format(round(x))
+    return "{}%".format(round(x * 100))
