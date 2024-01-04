@@ -15,12 +15,15 @@ from flask_sock import Sock
 from flask import request, abort, jsonify
 
 from app.openai_lib.assistant import Assistant
+import app.openai_lib.embedding_client as ec
 from app.lib import name_statistics as ns
 from app.lib import name_meaning as nm
 from app.lib import similar_names as sn
 from app.lib import name_pref as np
 from app.lib import session_id as sid
 from app.lib import origin_and_short_meaning as osm
+from app.lib.common import canonicalize_gender
+from app.lib import embedding_search as es
 
 app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -115,12 +118,12 @@ def get_name_facts():
 def suggest_names():
     """
     URL parameters:
-    - session_id
+    - session_id: required
+    - gender: required
     - source: default / popularity_ranking / cached / chatgpt
         -- default: let system decides
         -- popularity_ranking: based on last 3 years ranking of names; this is very fast
         -- cache: fetch from latest suggestions made by ChatGPT
-        - chatgpt: fetch from chatgpt; this usually takes 20+ seconds
     - any URL parameters which are accepted by update_user_pref()
     - any URL parameters which are accepted by update_user_sentiments
     :return: name proposals
@@ -132,21 +135,10 @@ def suggest_names():
     session_id = request.args.get('session_id', default="", type=str)
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
-
-    # suggestion from SSA popularity data or cache
-    source = request.args.get('source', default="", type=str)
-    cache_ts = redis_lib.get_last_proposal_time(session_id)
-    if (source.lower() in ['cache'] and cache_ts) or \
-            (source.lower() in ['default'] and cache_ts > redis_lib.get_last_pref_update_time(session_id)):
-        proposal_dict = redis_lib.get_name_proposals(session_id)
-        return jsonify(proposal_dict)
-    elif source.lower() in ['popularity_ranking']:
-        gender = request.args.get(np.GenderPref.get_url_param_name(), default="", type=str)
-        top_names = ns.NAME_STATISTICS.get_popular_names(gender)
-        resp_dict = OrderedDict()
-        for i, name in enumerate(top_names):
-            resp_dict[name] = 'Ranked {} most popular names in the past 3 years'.format(i + 1)
-        return jsonify(resp_dict)
+    gender = request.args.get(np.GenderPref.get_url_param_name(), default="", type=str)
+    gender = canonicalize_gender(gender)
+    if not gender:
+        abort(400, "missing the required parameter of gender")
 
     # update user preferences
     update_user_pref()
@@ -154,17 +146,28 @@ def suggest_names():
     # Update user sentiments
     update_user_sentiments(raise_on_missing_param=False)
 
+    # suggestion from SSA popularity data or cache
+    source = request.args.get('source', default="", type=str)
+    cache_ts = redis_lib.get_last_proposal_time(session_id)
+    if source.lower() in ['cache'] and cache_ts:
+        proposal_list = redis_lib.get_name_proposals(session_id)
+        return jsonify(proposal_list)
+    elif source.lower() in ['popularity_ranking']:
+        top_names = ns.NAME_STATISTICS.get_popular_names(gender)
+        return jsonify(top_names)
+
     # Fetch all preferences and sentiments from redis
     user_prefs = redis_lib.get_user_pref(session_id)
     user_sentiments = redis_lib.get_user_sentiments(session_id)
 
-    # Fetch proposals from ChatGPT
-    resp_dict = chat_completion.send_and_receive(user_prefs, user_sentiments)
+    # Fetch proposals from Embedding client
+    eb = ec.creat_embedding_from_pref_sentiments(gender, user_prefs, user_sentiments)
+    suggested_names = es.FAISS_SEARCH.search_with_embedding(gender, eb, num_of_result=10)
 
     # Write a copy in redis for late references
-    redis_lib.update_name_proposals(session_id, resp_dict)
+    redis_lib.update_name_proposal(session_id, suggested_names)
 
-    return jsonify(resp_dict)
+    return jsonify(suggested_names)
 
 
 @app.route("/babyname/update_user_pref")

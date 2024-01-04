@@ -12,15 +12,25 @@ import time
 import os
 import redis
 
-from typing import Dict
+from typing import Dict, List
 import app.lib.name_pref as np
 
 LAST_PREF_UPDATE_TS_KEY = 'last_pref_update_ts'
-LAST_PROPOSAL_TS_KEY = 'last_proposal_update_ts'
 
 redis_host = os.environ.get("REDISHOST", "10.49.86.211")
 redis_port = int(os.environ.get("REDISPORT", 6379))
 redis_client = redis.StrictRedis(host=redis_host, port=redis_port, charset="utf-8", decode_responses=True)
+
+TWO_WEEKS_IN_SECONDS = 2 * 7 * 24 * 60
+
+
+def get_pref_key(session_id):
+    return 'pref-{}'.format(session_id)
+
+
+def get_last_pref_update_time(session_id) -> int:
+    last_ts = redis_client.zscore(LAST_PREF_UPDATE_TS_KEY, session_id)
+    return last_ts if last_ts else 0
 
 
 def update_user_pref(session_id, user_prefs: Dict[str, np.PrefInterface]):
@@ -67,6 +77,10 @@ def get_user_pref(session_id: str):
     all_prefs = np.str_dict_to_class_dict(raw_general_pref)
 
     return all_prefs
+
+
+def get_user_sentiments_key(session_id):
+    return 'sentiment-{}'.format(session_id)
 
 
 def update_user_sentiments(session_id, name_sentiments: np.UserSentiments):
@@ -128,51 +142,79 @@ def get_sentiment_for_name(session_id: str, name) -> Dict[str, str]:
     return json.loads(sentiment_str)
 
 
-def update_name_proposals(session_id, proposals: Dict[str, str]):
+"""
+Name proposal
+- name proposals: a user-specific list which stores the name proposals
+- name proposal reason job: a shared list for the background job to fetch 
+- name proposal reason: a user-specific hash with the name as key and with the reason as value
+"""
+
+
+PROPOSAL_REASON_JOB_QUEUE_KEY = 'reason_job_que'
+
+
+def get_name_proposals_key(session_id):
+    return 'proposal-{}'.format(session_id)
+
+
+def get_last_proposal_time_key(session_id):
+    return 'proposal-ts-{}'.format(session_id)
+
+
+def get_name_proposal_reason_key(session_id):
+    return 'proposal-reason-{}'.format(session_id)
+
+
+def update_name_proposal(session_id: str, proposals: List[str], update_job_que=True):
+    if not proposals:
+        return
+
     pipeline = redis_client.pipeline()
 
+    # set proposed names
     proposal_key = get_name_proposals_key(session_id)
-    pipeline.hset(proposal_key, mapping=proposals)
-    pipeline.zadd(LAST_PROPOSAL_TS_KEY, mapping={session_id: int(time.time())})
+    pipeline.rpush(proposal_key, *proposals)
+    pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
+
+    # set last updated timestamp
+    last_proposal_time_key = get_last_proposal_time_key(session_id)
+    pipeline.set(last_proposal_time_key, int(time.time()), ex=TWO_WEEKS_IN_SECONDS)
+
+    # Add a job in queue if needed
+    if update_job_que:
+        pipeline.rpush(PROPOSAL_REASON_JOB_QUEUE_KEY, session_id)
+        pipeline.expire(PROPOSAL_REASON_JOB_QUEUE_KEY, time=TWO_WEEKS_IN_SECONDS)
 
     pipeline.execute()
 
 
-def get_name_proposals(session_id) -> Dict[str, str]:
+def get_name_proposals(session_id) -> List[str, str]:
     """
-    :return: a dictionary like
-    {
-        "Asher": "Asher is a modern and trendy name...",
-        "Caleb": "Caleb is a stylish and contemporary ...",
-        "Ethan": "Ethan is..."
-    }
+    :return: a list like ["Asher", "Caleb", "Ethan":]
     """
     proposal_key = get_name_proposals_key(session_id)
-    return redis_client.hgetall(proposal_key)
+    return redis_client.lrange(proposal_key, 0, -1)
 
 
-def get_proposal_for_name(session_id, name) -> str:
-    proposal_key = get_name_proposals_key(session_id)
+def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], clear_job_que=True):
+    pipeline = redis_client.pipeline()
+
+    proposal_reason_key = get_name_proposal_reason_key(session_id)
+    pipeline.hset(proposal_reason_key, mapping=proposal_reasons)
+    pipeline.expire(proposal_reason_key, time=TWO_WEEKS_IN_SECONDS)
+
+    if clear_job_que:
+        pipeline.lrem(PROPOSAL_REASON_JOB_QUEUE_KEY, 1, session_id)
+
+    pipeline.execute()
+
+
+def get_proposal_reason_for_name(session_id, name) -> str:
+    proposal_key = get_name_proposal_reason_key(session_id)
     return redis_client.hget(proposal_key, name)
 
 
-def get_last_pref_update_time(session_id) -> int:
-    last_ts = redis_client.zscore(LAST_PREF_UPDATE_TS_KEY, session_id)
-    return last_ts if last_ts else 0
-
-
 def get_last_proposal_time(session_id) -> int:
-    last_ts = redis_client.zscore(LAST_PROPOSAL_TS_KEY, session_id)
+    last_proposal_time_key = get_last_proposal_time_key(session_id)
+    last_ts = redis_client.get(last_proposal_time_key)
     return last_ts if last_ts else 0
-
-
-def get_pref_key(session_id):
-    return 'pref-{}'.format(session_id)
-
-
-def get_user_sentiments_key(session_id):
-    return 'user-sentiments-{}'.format(session_id)
-
-
-def get_name_proposals_key(session_id):
-    return 'name-proposals-{}'.format(session_id)
