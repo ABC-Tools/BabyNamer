@@ -75,7 +75,7 @@ class NameMeaning:
 
     @staticmethod
     def get_source_file():
-        return os.path.join(get_app_root_dir(), 'data', 'name_meaning.txt')
+        return os.path.join(get_app_root_dir(), 'data', 'name_meaning_new.txt')
 
 
 NAME_MEANING = NameMeaning()

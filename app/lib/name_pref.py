@@ -3,6 +3,7 @@ from typing import Any, List, Dict, Union
 import json
 from enum import Enum
 from .common import Gender, canonicalize_gender, canonicalize_name
+import app.lib.name_rating as nr
 
 
 class PrefInterface:
@@ -191,50 +192,6 @@ class Origin(StringPref):
         return Origin(val)
 
 
-class NameStyleEnum(Enum):
-    MODERN = 1
-    TRADITIONAL = 2
-
-    def __str__(self):
-        return f'{self.name}'.lower()
-
-
-class NameStyle(PrefInterface):
-    def __init__(self, style: NameStyleEnum):
-        self._style = style
-
-    @staticmethod
-    def get_url_param_name():
-        return 'style'
-
-    @staticmethod
-    def get_pref_meaning():
-        return 'style of name'
-
-    def get_val(self) -> NameStyleEnum:
-        return self._style
-
-    def get_native_val(self):
-        return str(self._style)
-
-    def get_val_str(self) -> str:
-        return str(self._style)
-
-    @staticmethod
-    def create(raw_style: str):
-        raw_style = raw_style.strip().lower()
-        if not raw_style:
-            return None
-
-        if raw_style in ['modern']:
-            return NameStyle(NameStyleEnum.MODERN)
-        elif raw_style in ['traditional']:
-            return NameStyle(NameStyleEnum.TRADITIONAL)
-
-        raise ValueError('Invalid style value; expect the value '
-                         'of "modern" or "traditional", but got: {}'.format(raw_style))
-
-
 class NamesToAvoid(ListPref):
     @staticmethod
     def get_url_param_name():
@@ -260,6 +217,321 @@ class NamesToAvoid(ListPref):
 
         canonicalize_name_list = [canonicalize_name(name) for name in name_list]
         return NamesToAvoid(canonicalize_name_list)
+
+
+class RatingPref(PrefInterface):
+
+    def __init__(self, choice: str):
+        self._choice = choice
+
+    def get_val(self):
+        return self._choice
+
+    def get_native_val(self):
+        return self._choice
+
+    def get_val_str(self) -> str:
+        return self._choice
+
+
+class StyleChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'style_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return StyleChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return StyleChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [StyleChoice.TYPES[3], StyleChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [StyleChoice.TYPES[3], StyleChoice.TYPES[4]]:
+            raise ValueError("Invalid style choice; must be either {} or {}, but got {}".format(
+                StyleChoice.TYPES[3], StyleChoice.TYPES[4], choice
+            ))
+        return StyleChoice(choice)
+
+
+class MaturityChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'maturity_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return MaturityChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return MaturityChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [MaturityChoice.TYPES[3], MaturityChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [MaturityChoice.TYPES[3], MaturityChoice.TYPES[4]]:
+            raise ValueError("Invalid maturity choice; must be either {} or {}, but got {}".format(
+                MaturityChoice.TYPES[3], MaturityChoice.TYPES[4], choice
+            ))
+        return MaturityChoice(choice)
+
+
+class FormalityChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'formality_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return FormalityChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return FormalityChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [FormalityChoice.TYPES[3], FormalityChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [FormalityChoice.TYPES[3], FormalityChoice.TYPES[4]]:
+            raise ValueError("Invalid formality choice; must be either {} or {}, but got {}".format(
+                FormalityChoice.TYPES[3], FormalityChoice.TYPES[4], choice
+            ))
+        return FormalityChoice(choice)
+
+
+class ClassChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'class_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return ClassChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return ClassChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [ClassChoice.TYPES[3], ClassChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [ClassChoice.TYPES[3], ClassChoice.TYPES[4]]:
+            raise ValueError("Invalid class choice; must be either {} or {}, but got {}".format(
+                ClassChoice.TYPES[3], ClassChoice.TYPES[4], choice
+            ))
+        return ClassChoice(choice)
+
+
+class EnvironmentChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'environment_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return EnvironmentChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return EnvironmentChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [EnvironmentChoice.TYPES[3], EnvironmentChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [EnvironmentChoice.TYPES[3], EnvironmentChoice.TYPES[4]]:
+            raise ValueError("Invalid environment choice; must be either {} or {}, but got {}".format(
+                EnvironmentChoice.TYPES[3], EnvironmentChoice.TYPES[4], choice
+            ))
+        return EnvironmentChoice(choice)
+
+
+class MoralChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'moral_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return MoralChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return MoralChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [MoralChoice.TYPES[3], MoralChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [MoralChoice.TYPES[3], MoralChoice.TYPES[4]]:
+            raise ValueError("Invalid moral choice; must be either {} or {}, but got {}".format(
+                MoralChoice.TYPES[3], MoralChoice.TYPES[4], choice
+            ))
+        return MoralChoice(choice)
+
+
+class StrengthChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'strength_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return StrengthChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return StrengthChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [StrengthChoice.TYPES[3], StrengthChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [StrengthChoice.TYPES[3], StrengthChoice.TYPES[4]]:
+            raise ValueError("Invalid strength choice; must be either {} or {}, but got {}".format(
+                StrengthChoice.TYPES[3], StrengthChoice.TYPES[4], choice
+            ))
+        return StrengthChoice(choice)
+
+
+class TextureChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'texture_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return TextureChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return TextureChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [TextureChoice.TYPES[3], TextureChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [TextureChoice.TYPES[3], TextureChoice.TYPES[4]]:
+            raise ValueError("Invalid texture choice; must be either {} or {}, but got {}".format(
+                TextureChoice.TYPES[3], TextureChoice.TYPES[4], choice
+            ))
+        return TextureChoice(choice)
+
+
+class CreativityChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'creativity_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return CreativityChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return CreativityChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [CreativityChoice.TYPES[3], CreativityChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [CreativityChoice.TYPES[3], CreativityChoice.TYPES[4]]:
+            raise ValueError("Invalid creativity choice; must be either {} or {}, but got {}".format(
+                CreativityChoice.TYPES[3], CreativityChoice.TYPES[4], choice
+            ))
+        return CreativityChoice(choice)
+
+
+class ComplexityChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'complexity_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return ComplexityChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return ComplexityChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [ComplexityChoice.TYPES[3], ComplexityChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [ComplexityChoice.TYPES[3], ComplexityChoice.TYPES[4]]:
+            raise ValueError("Invalid complexity choice; must be either {} or {}, but got {}".format(
+                ComplexityChoice.TYPES[3], ComplexityChoice.TYPES[4], choice
+            ))
+        return ComplexityChoice(choice)
+
+
+class ToneChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'tone_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return ToneChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return ToneChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [ToneChoice.TYPES[3], ToneChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [ToneChoice.TYPES[3], ToneChoice.TYPES[4]]:
+            raise ValueError("Invalid tone choice; must be either {} or {}, but got {}".format(
+                ToneChoice.TYPES[3], ToneChoice.TYPES[4], choice
+            ))
+        return ToneChoice(choice)
+
+
+class IntellectualChoice(RatingPref):
+    TYPES = next(x for x in nr.ALL_RATINGS if 'intellectual_option' in x)
+
+    @staticmethod
+    def get_url_param_name():
+        return IntellectualChoice.TYPES[2]
+
+    @staticmethod
+    def get_pref_meaning():
+        return IntellectualChoice.TYPES[2].replace('_', ' ')
+
+    @staticmethod
+    def get_possible_vals():
+        return [IntellectualChoice.TYPES[3], IntellectualChoice.TYPES[4]]
+
+    @staticmethod
+    def create(choice: str):
+        choice = choice.lower().capitalize()
+        if choice not in [IntellectualChoice.TYPES[3], IntellectualChoice.TYPES[4]]:
+            raise ValueError("Invalid intellectual choice; must be either {} or {}, but got {}".format(
+                IntellectualChoice.TYPES[3], IntellectualChoice.TYPES[4], choice
+            ))
+        return IntellectualChoice(choice)
 
 
 class Sentiment(Enum):
@@ -490,6 +762,16 @@ def name_sentiments_by_sentiments(name_sentiments: UserSentiments) -> Dict[str, 
 
 
 ALL_PREFERENCES = [GenderPref, FamilyName, MotherName, FatherName, SiblingNames,
-                   Origin, NamesToAvoid, NameStyle, OtherPref]
+                   Origin, NamesToAvoid, OtherPref,
+                   StyleChoice, MaturityChoice, FormalityChoice, ClassChoice,
+                   EnvironmentChoice, MoralChoice, StrengthChoice, TextureChoice,
+                   CreativityChoice, ComplexityChoice, ToneChoice, IntellectualChoice]
 
 
+NAME_PREFS = [FamilyName, MotherName, FatherName, SiblingNames, NamesToAvoid]
+
+TEXT_PREFS = [Origin, OtherPref]
+
+OPTION_PREFS = [StyleChoice, MaturityChoice, FormalityChoice, ClassChoice,
+                EnvironmentChoice, MoralChoice, StrengthChoice, TextureChoice,
+                CreativityChoice, ComplexityChoice, ToneChoice, IntellectualChoice]

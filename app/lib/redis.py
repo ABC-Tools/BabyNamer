@@ -40,9 +40,6 @@ def update_user_pref(session_id, user_prefs: Dict[str, np.PrefInterface]):
     if len(user_prefs) == 0:
         return True
 
-    # TODO: detect the changes that liked names are changed to disliked/saved and vice versa
-    # TODO: read redis first, and write redis only if there is a diff
-
     pref_dict = np.class_dict_to_str_dict(user_prefs)
 
     # add general preferences into redis pipeline
@@ -89,9 +86,6 @@ def update_user_sentiments(session_id, name_sentiments: np.UserSentiments):
     """
     if not name_sentiments:
         return True
-
-    # TODO: detect the changes that liked names are changed to disliked/saved and vice versa
-    # TODO: read redis first, and write redis only if there is a diff
 
     name_sentiments_key = get_user_sentiments_key(session_id)
     # Collapse the second level dictionary into string, such that we can write it into redis
@@ -188,7 +182,7 @@ def update_name_proposal(session_id: str, proposals: List[str], update_job_que=T
     pipeline.execute()
 
 
-def get_name_proposals(session_id) -> List[str, str]:
+def get_name_proposals(session_id) -> List[str]:
     """
     :return: a list like ["Asher", "Caleb", "Ethan":]
     """

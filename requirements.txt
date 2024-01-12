@@ -28,6 +28,12 @@ tqdm==4.62.3
 urllib3==1.26.7
 
 openai==1.2.0
+tiktoken
+
 redis==5.0.0
+
 scipy
 faiss-cpu
+
+# for background worker
+supervisor

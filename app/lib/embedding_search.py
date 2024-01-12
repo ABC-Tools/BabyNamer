@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Union, List
+from typing import Union, List, Dict
 
 import faiss
 import os
@@ -38,6 +38,11 @@ class FaissSearch:
         embedding = embedding_client.create_single_embedding(msg)
         return self.search_with_embedding(gender, embedding, num_of_result)
 
+    def get_embeddings(self, gender: Union[str, Gender], name: str):
+        gender = canonicalize_gender(gender)
+        name = canonicalize_name(name)
+        return self._name_embedding_dict[gender].get(name, [])
+
     def similar_names(self, gender: Union[str, Gender], name: str, num_of_result=10):
         gender = canonicalize_gender(gender)
         name = canonicalize_name(name)
@@ -45,17 +50,22 @@ class FaissSearch:
         if not embedding:
             return []
 
-        return self.search_with_embedding(gender, embedding, num_of_result)
+        result = self.search_with_embedding(gender, embedding, num_of_result + 1)
+        # the first one is always the intput name itself
+        return result[1:]
 
-    def search_with_embedding(self, gender: Gender, embedding: List[float], num_of_result=10):
+    def search_with_embedding(self, gender: Gender, embedding: List[float], num_of_result=10)\
+            -> Dict[str, float]:
         embedding_nparray = np.asarray([embedding])
         start_ts = time.time()
         distances, indices = self._index[gender].search(embedding_nparray, num_of_result)
-        logging.debug('search_with_embedding took {} seconds : {}, with distance of {}'.format(
-            time.time() - start_ts, indices[0], distances[0]))
-        result_names = [self._name_list[gender][i] for i in indices[0]]
 
-        return result_names
+        max_display_num = min(num_of_result, 10)
+        logging.debug('search_with_embedding took {} seconds : {}, with distance of {}'.format(
+            time.time() - start_ts, indices[0][0:max_display_num], distances[0][0:max_display_num]))
+
+        result_names = [self._name_list[gender][i] for i in indices[0]]
+        return {name: score for name, score in zip(result_names, distances[0])}
 
     @staticmethod
     def build_index(gender):
@@ -79,9 +89,9 @@ class FaissSearch:
     @staticmethod
     def get_source_file(gender: Gender):
         if gender == Gender.BOY:
-            return os.path.join(get_app_root_dir(), 'data', 'name_embedding-boy.txt')
+            return os.path.join(get_app_root_dir(), 'data', 'name_embedding-concise_rating-boy.txt')
         else:
-            return os.path.join(get_app_root_dir(), 'data', 'name_embedding-girl.txt')
+            return os.path.join(get_app_root_dir(), 'data', 'name_embedding-concise_rating-girl.txt')
 
 
 FAISS_SEARCH = FaissSearch()

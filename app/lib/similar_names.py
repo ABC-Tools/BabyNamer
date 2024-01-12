@@ -4,6 +4,7 @@ import logging
 
 from typing import Dict, Tuple, List, Any
 from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir
+import app.lib.name_statistics as ns
 
 
 class SimilarNames:
@@ -14,52 +15,37 @@ class SimilarNames:
         name = canonicalize_name(raw_name)
         gender = canonicalize_gender(raw_gender)
         if gender:
-            result = self.__similar_names__.get((name, gender), [])
-            if not result:
-                result = self.__similar_names__.get((name, None), [])
-            return result
+            gender = ns.NAME_STATISTICS.guess_gender(name)
 
-        # try different genders
-        result = self.__similar_names__.get((name, None), {})
-        if not result:
-            result = self.__similar_names__.get((name, Gender.GIRL), [])
-        if not result:
-            result = self.__similar_names__.get((name, Gender.BOY), [])
-        return result
+        return self.__similar_names__[gender].get(name, [])
 
     @staticmethod
     def load_file():
         """
         The input has the format of
-        [
-            {
-                'name': 'San'',
-                'gender': 'boy',  <- optional
-                'similar_names': ["wynnie", "miller", "everley", ...]
-            },
+        {
+            'San': ["wynnie", "miller", "everley", ...],
             ...
-        ]
+        {
         :return:
         """
         json_filename = SimilarNames.get_source_file()
         with open(json_filename, 'r') as fin:
             data = json.load(fin)
 
-        logging.info("Loaded number of names: {}".format(len(data)))
+        output = {
+            Gender.BOY: data[str(Gender.BOY)],
+            Gender.GIRL: data[str(Gender.GIRL)]
+        }
 
-        output = {}
-        for elem in data:
-            name = canonicalize_name(elem['name'])
-            gender = canonicalize_gender(elem.get('gender', ''))
-            similar_names = elem['similar_names']
-
-            output[(name, gender)] = similar_names
+        logging.info("similar names: loaded number of boy names: {} and number of girl names: {}".format(
+            len(output[Gender.BOY]), len(output[Gender.GIRL])))
 
         return output
 
     @staticmethod
     def get_source_file():
-        return os.path.join(get_app_root_dir(), 'data', 'similar_names.json')
+        return os.path.join(get_app_root_dir(), 'data', 'similar_names_from_embedding.json')
 
 
 SIMILAR_NAMES = SimilarNames()

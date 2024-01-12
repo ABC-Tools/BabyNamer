@@ -1,19 +1,26 @@
 import logging
 import sys
+import os
 
+context = os.environ.get('CONTEXT', 'flask')
 
-logging.basicConfig(format='%(asctime)s %(message)s',
-                    filename='/var/log/flask.log',
-                    level=logging.DEBUG)
+if context != 'worker':
+    if os.environ.get('ENV', 'PROD') == 'DEV':
+        logging.basicConfig(format='%(asctime)s %(message)s',
+                            filename='/var/log/flask.log',
+                            level=logging.DEBUG)
+    else:
+        logging.basicConfig(format='%(asctime)s %(message)s',
+                            filename='/var/log/flask.log',
+                            level=logging.INFO)
 
-root_logger = logging.getLogger()
-werkzeug_logger = logging.getLogger("werkzeug")  # grabs underlying WSGI logger
+    root_logger = logging.getLogger()
+    werkzeug_logger = logging.getLogger("werkzeug")  # grabs underlying WSGI logger
 
+    handler = logging.FileHandler('/var/log/flask.log')  # creates handler for the log file
+    handler.setFormatter("%(asctime)s %(levelname)s %(message)s")
 
-handler = logging.FileHandler('/var/log/flask.log')  # creates handler for the log file
-# handler.setFormatter("%(asctime)s %(levelname)s %(message)s")
-
-werkzeug_logger.addHandler(handler)  # adds handler to the werkzeug WSGI logger
-werkzeug_logger.addHandler(logging.StreamHandler(sys.stdout))
-root_logger.addHandler(handler)
-root_logger.addHandler(logging.StreamHandler(sys.stdout))
+    werkzeug_logger.addHandler(handler)  # adds handler to the werkzeug WSGI logger
+    werkzeug_logger.addHandler(logging.StreamHandler(sys.stdout))
+    root_logger.addHandler(handler)
+    root_logger.addHandler(logging.StreamHandler(sys.stdout))

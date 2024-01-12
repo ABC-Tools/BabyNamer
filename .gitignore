@@ -9,8 +9,7 @@ __pycache__/
 *.so
 
 # big files
-name_embedding-boy.txt
-name_embedding-girl.txt
+name_embedding*.txt
 
 # Distribution / packaging
 .Python

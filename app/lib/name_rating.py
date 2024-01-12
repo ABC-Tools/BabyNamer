@@ -15,7 +15,7 @@ ALL_RATINGS = [
     ("A Good Name", "A Bad Name", 'overall_option', "Good", "Bad"),
     ("Masculine", "Feminine", 'gender_option', "Masculine", "Feminine"),
     ("Classic", "Modern", 'style_option', "Classic", "Modern"),
-    ("Mature", "Youthful", 'age_option', "Mature", "Youthful"),
+    ("Mature", "Youthful", 'maturity_option', "Mature", "Youthful"),
     ("Formal", "Informal", 'formality_option', "Formal", "Casual"),
     ("Upper Class", "Common", 'class_option', "Noble", "Grassroots "),
     ("Urban", "Natural", 'environment_option', "Urban", "Natural"),
@@ -28,8 +28,8 @@ ALL_RATINGS = [
     ("Nerdy", "Unintellectual", 'intellectual_option', "Intellectual", "Modest")
 ]
 
-DISPLAY_RATINGS = set(["Classic", "Mature", "Formal", "Noble", "Urban", "Wholesome", "Strong",
-                       "Refined", "Creative", "Simple", "Serious", "Intellectual"])
+DISPLAY_RATINGS = {"Classic", "Mature", "Formal", "Noble", "Urban", "Wholesome", "Strong", "Refined", "Creative",
+                   "Simple", "Serious", "Intellectual"}
 
 RATING_DISTRIBUTION = {
     Gender.BOY: {
@@ -90,73 +90,57 @@ class NameRating:
         result = {}
         rating_dict = self.__name_rating__[gender][name]
         for types in ALL_RATINGS:
-            score = rating_dict[types[3]]
-            zscore = self._get_zscore(gender, name, types, types[3])
-            percentile_str = float_to_percentage(stats.norm.sf(abs(zscore)), min_val=1)
+            url_param = types[2]
+            ext_opt1 = types[3]
+            ext_opt2 = types[4]
+
+            score = rating_dict[ext_opt1]
+            zscore = self._get_zscore(gender, name, url_param, ext_opt1, ext_opt2, ext_opt1)
+            percentile_float = stats.norm.sf(abs(zscore))
+            percentile_str = float_to_percentage(percentile_float, min_val=1)
 
             result[types[2]] = {
-                types[3]: (float_to_percentage(score),
-                           'top' if zscore > 0 else 'bottom',
-                           percentile_str),
-                types[4]: (float_to_percentage(1 - score),
-                           'bottom' if zscore > 0 else 'top',
-                           percentile_str)
+                types[3]: (float_to_percentage(score), 'top' if zscore > 0 else 'bottom',
+                           percentile_str, zscore, percentile_float),
+                types[4]: (float_to_percentage(1 - score), 'bottom' if zscore > 0 else 'top',
+                           percentile_str, -zscore, percentile_float)
             }
         return result
 
-    def stats(self, gender: Gender):
-        count = {
-            "A Good Name": 0,
-            "Masculine": 0,
-            "Classic": 0,
-            "Mature": 0,
-            "Formal": 0,
-            "Noble": 0,
-            "Urban": 0,
-            "Wholesome": 0,
-            "Strong": 0,
-            "Refined": 0,
-            "Creative": 0,
-            "Simple": 0,
-            "Serious": 0,
-            "Intellectual": 0,
-        }
-        for types in ALL_RATINGS:
-            for name in self._names[gender]:
-                score = self.__name_rating__[gender][name][types[3]]
-                if score >= 0.5:
-                    count[types[3]] += 1
-
-        total = len(self._names[gender])
-        percentage = {key: "{}%".format(round(100.0 * val / total)) for key, val in count.items()}
-        logging.info('Total: {}, count of names with >=50%: {}, percentage: {}'.format(
-            total, count, percentage
-        ))
-
-    def suggest(self, raw_target_gender: str, options: Dict[str, str], count=20) -> List[str]:
+    def suggest(self, raw_target_gender: Union[str, Gender], options: Dict[str, str], count=20)\
+            -> Tuple[Dict[str, float], Dict[str, str]]:
         start_ts = time.time()
-        suggest_names = self._suggest1(raw_target_gender, options, count=count)
+        suggest_name_scores = self._suggest1(raw_target_gender, options, count=count)
         logging.debug('time spent for suggesting names: {} seconds'.format(time.time() - start_ts))
-        suggest_name_reasons = self._create_suggest_reason(raw_target_gender, suggest_names, options)
-        logging.debug('time spent for writing reasons: {} seconds'.format(time.time() - start_ts))
 
-        return suggest_name_reasons
+        suggest_name_reasons = self._create_suggest_reason(raw_target_gender,
+                                                           list(suggest_name_scores.keys()),
+                                                           options)
 
-    def _create_suggest_reason(self, raw_target_gender: str, names: List[str], options: Dict[str, str]):
+        return suggest_name_scores, suggest_name_reasons
+
+    def _create_suggest_reason(self, raw_target_gender: str, names: List[str], options: Dict[str, str])\
+            -> Dict[str, str]:
         target_gender = canonicalize_gender(raw_target_gender)
         if not target_gender:
             raise ValueError('Invalid target gender: {}'.format(raw_target_gender))
 
         name_reasons = {name: {'pros': [], 'cons': []} for name in names}
 
-        for rating_types in ALL_RATINGS:
-            url_param = rating_types[2]
+        for url_param, choice in options.items():
+            opt1, opt2 = NameRating.get_options_by_url_param(url_param)
+            if not opt1 or not opt2:
+                logging.warning('Unexpected URL param for rating choice: {}; skip'.format(url_param))
+                continue
+
             choice = options.get(url_param, "").strip()
-            if not choice:
+            if not choice or choice not in [opt1, opt2]:
+                logging.warning('Unexpected choice: "{}", allowed values are "{}" and "{}"; skip'.format(
+                    choice if choice else '', opt1, opt2))
                 continue
 
             for name in names:
-                zscore = self._get_zscore(target_gender, name, rating_types, choice)
+                zscore = self._get_zscore(target_gender, name, url_param, opt1, opt2, choice)
                 percentile = float_to_percentage(stats.norm.sf(abs(zscore)), min_val=1)
                 """
                 logging.debug('percentile for {name} for {choice} is {direction} {percentile}'.format(
@@ -188,26 +172,33 @@ class NameRating:
 
         return name_reason_sentences
 
-    def _suggest1(self, raw_target_gender: str, options: Dict[str, str], count=20, cap_zscore=2.0):
+    def _suggest1(self, raw_target_gender: str, options: Dict[str, str], count=20, cap_zscore=2.0)\
+            -> Dict[str, float]:
         target_gender = canonicalize_gender(raw_target_gender)
         if not target_gender:
             raise ValueError('Invalid target gender: {}'.format(raw_target_gender))
 
-        # score all names
+        # score all top names
         available_names = set(self._names[target_gender])
         top_names = set(ns.NAME_STATISTICS.get_popular_names(target_gender, count=5000))
         top_available_names = available_names.intersection(top_names)
         logging.debug('# of Top available names for suggest is {}'.format(len(top_available_names)))
         name_score_dict = {x: 0.0 for x in top_available_names}
 
-        for rating_types in ALL_RATINGS:
-            url_param = rating_types[2]
+        for url_param, choice in options.items():
+            opt1, opt2 = NameRating.get_options_by_url_param(url_param)
+            if not opt1 or not opt2:
+                logging.warning('Unexpected URL param for rating choice: {}; skip'.format(url_param))
+                continue
+
             choice = options.get(url_param, "").strip()
-            if not choice:
+            if not choice or choice not in [opt1, opt2]:
+                logging.warning('Unexpected choice: "{}", allowed values are "{}" and "{}"; skip'.format(
+                    choice if choice else '', opt1, opt2))
                 continue
 
             for name in name_score_dict.keys():
-                zscore = self._get_zscore(target_gender, name, rating_types, choice)
+                zscore = self._get_zscore(target_gender, name, url_param, opt1, opt2, choice)
                 # Cap zscore to prevent 1 dimension to dominate
                 adjusted_zscore = max(min(zscore, cap_zscore), -cap_zscore)
                 name_score_dict[name] += adjusted_zscore
@@ -216,19 +207,44 @@ class NameRating:
         name_score_list = sorted(name_score_list, key=lambda x: x[1], reverse=True)
 
         count = min(count, len(name_score_list))
-        result_names = [name_score[0] for name_score in name_score_list[0:count]]
+        result_dict = {name_score[0]: name_score[1] for name_score in name_score_list[0:count]}
 
-        logging.info('Final list: {}'.format(name_score_list[0:count]))
+        return result_dict
 
-        return result_names
+    def stats(self, gender: Gender):
+        count = {
+            "A Good Name": 0,
+            "Masculine": 0,
+            "Classic": 0,
+            "Mature": 0,
+            "Formal": 0,
+            "Noble": 0,
+            "Urban": 0,
+            "Wholesome": 0,
+            "Strong": 0,
+            "Refined": 0,
+            "Creative": 0,
+            "Simple": 0,
+            "Serious": 0,
+            "Intellectual": 0,
+        }
+        for types in ALL_RATINGS:
+            for name in self._names[gender]:
+                score = self.__name_rating__[gender][name][types[3]]
+                if score >= 0.5:
+                    count[types[3]] += 1
 
-    def _get_zscore(self, gender: Gender, name: str, rating_types: List[str], option_choice: str):
+        total = len(self._names[gender])
+        percentage = {key: "{}%".format(round(100.0 * val / total)) for key, val in count.items()}
+        logging.info('Total: {}, count of names with >=50%: {}, percentage: {}'.format(
+            total, count, percentage
+        ))
+
+    def _get_zscore(self, gender: Gender, name: str,
+                    url_param: str, ext_option1: str, ext_option2: str,
+                    option_choice: str) -> float:
         if name not in self.__name_rating__[gender]:
             return 0
-
-        url_param = rating_types[2]
-        ext_option1 = rating_types[3]
-        ext_option2 = rating_types[4]
 
         if option_choice.lower() == ext_option1.lower():
             go_higher = True
@@ -336,6 +352,11 @@ class NameRating:
     def get_score(rating_record: List[Dict[str, str]], int_opt1: str) -> float:
         record = next(x for x in rating_record if int_opt1 in x)
         return percentage_to_float(record[int_opt1])
+
+    @staticmethod
+    def get_options_by_url_param(url_param):
+        record = next(x for x in ALL_RATINGS if url_param == x[2])
+        return record[3], record[4]
 
     @staticmethod
     def get_source_file():

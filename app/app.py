@@ -1,29 +1,25 @@
-import json
-from collections import OrderedDict
-
 from werkzeug.exceptions import HTTPException
 
+import json
 import flask
 import socket
 import logging
 import os
 
-import app.openai_lib.chat_completion as chat_completion
-import app.lib.redis as redis_lib
-
 from flask_sock import Sock
 from flask import request, abort, jsonify
 
+import app.lib.redis as redis_lib
 from app.openai_lib.assistant import Assistant
-import app.openai_lib.embedding_client as ec
 from app.lib import name_statistics as ns
 from app.lib import name_meaning as nm
 from app.lib import similar_names as sn
 from app.lib import name_pref as np
 from app.lib import session_id as sid
 from app.lib import origin_and_short_meaning as osm
-from app.lib.common import canonicalize_gender
-from app.lib import embedding_search as es
+from app.lib.common import canonicalize_gender, canonicalize_name
+
+import app.procedure.suggest_names as suggest_names
 
 app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -44,7 +40,8 @@ def handle_error(e):
 
 @app.route("/")
 def index():
-    return flask.render_template('home.html')
+    # return flask.render_template('home.html')
+    return 'success'
 
 
 @app.route("/babyname/name_facts")
@@ -82,6 +79,7 @@ def get_name_facts():
     gender = request.args.get('gender', default="", type=str)
     if not name:
         abort(400, 'Missing name parameter')
+    name = canonicalize_name(name)
 
     valid_male_gender = ['male', 'boy']
     valid_female_gender = ['female', 'girl']
@@ -102,7 +100,7 @@ def get_name_facts():
     }
 
     # get last recommendation reason if there is one
-    proposal_reason = redis_lib.get_proposal_for_name(session_id, name)
+    proposal_reason = redis_lib.get_proposal_reason_for_name(session_id, name)
     if proposal_reason:
         output['recommend_reason'] = proposal_reason
 
@@ -120,10 +118,6 @@ def suggest_names():
     URL parameters:
     - session_id: required
     - gender: required
-    - source: default / popularity_ranking / cached / chatgpt
-        -- default: let system decides
-        -- popularity_ranking: based on last 3 years ranking of names; this is very fast
-        -- cache: fetch from latest suggestions made by ChatGPT
     - any URL parameters which are accepted by update_user_pref()
     - any URL parameters which are accepted by update_user_sentiments
     :return: name proposals
@@ -141,53 +135,56 @@ def suggest_names():
         abort(400, "missing the required parameter of gender")
 
     # update user preferences
-    update_user_pref()
+    pref_resp_msg = update_user_pref(func_call=True)
 
     # Update user sentiments
-    update_user_sentiments(raise_on_missing_param=False)
+    update_user_sentiments(func_call=True)
 
-    # suggestion from SSA popularity data or cache
-    source = request.args.get('source', default="", type=str)
-    cache_ts = redis_lib.get_last_proposal_time(session_id)
-    if source.lower() in ['cache'] and cache_ts:
-        proposal_list = redis_lib.get_name_proposals(session_id)
-        return jsonify(proposal_list)
-    elif source.lower() in ['popularity_ranking']:
-        top_names = ns.NAME_STATISTICS.get_popular_names(gender)
-        return jsonify(top_names)
+    # if user preference is not updated and there is previous proposals, use the previous proposals
+    if 'no-op' in pref_resp_msg.get('msg', ''):
+        last_proposals = redis_lib.get_name_proposals(session_id)
+        if last_proposals:
+            return jsonify(last_proposals)
 
-    # Fetch all preferences and sentiments from redis
-    user_prefs = redis_lib.get_user_pref(session_id)
-    user_sentiments = redis_lib.get_user_sentiments(session_id)
-
-    # Fetch proposals from Embedding client
-    eb = ec.creat_embedding_from_pref_sentiments(gender, user_prefs, user_sentiments)
-    suggested_names = es.FAISS_SEARCH.search_with_embedding(gender, eb, num_of_result=10)
-
-    # Write a copy in redis for late references
-    redis_lib.update_name_proposal(session_id, suggested_names)
+    suggested_names = suggest_names.suggest(session_id, gender)
 
     return jsonify(suggested_names)
 
 
 @app.route("/babyname/update_user_pref")
-def update_user_pref():
+def update_user_pref(func_call=False):
     """
     URL parameters:
-        - session_id:
-        - gender: boy/girl,
+        - session_id: required
+        - gender: boy/girl, required
         - family_name: Tan
         - mother_name: Amy
         - father_name: Sam
-        - sibling_names: ["Kaitlyn", "George"]
-        - origin: China
+        - * sibling_names: ["Kaitlyn", "George"]
+        - * origin: China
         - names_to_avoid: ["Mike", "Allen"]
-        - other: "whatever the user writes"
+        - * other: "whatever the user writes"
+        - * 'popularity_option': "Popular" / "Unique"
+        - * 'style_option': "Classic"/"Modern",
+        - 'maturity_option': "Mature"/"Youthful"
+        - 'formality_option': "Formal"/"Casual"
+        - 'class_option': "Noble"/"Grassroots "
+        - 'environment_option': "Urban"/"Natural"
+        - 'moral_option': "Wholesome"/"Tactful"
+        - 'strength_option': "Strong"/"Delicate"
+        - * 'texture_option': "Refined"/"Rough"
+        - 'creativity_option': "Creative"/"Practical"
+        - * 'complexity_option': "Simple"/"Complex"
+        - 'tone_option': "Serious"/"Cute"
+        - 'intellectual_option': "Intellectual"/"Modest"
     :return:
     """
     session_id = request.args.get('session_id', default="", type=str)
     if not session_id or not sid.verify_session_id(session_id):
-        abort(400, "missing or invalid session id: {}".format(session_id))
+        if func_call:
+            return {"msg": "failure"}
+        else:
+            abort(400, "missing or invalid session id: {}".format(session_id))
 
     # Parse parameters
     all_prefs = {}
@@ -196,13 +193,16 @@ def update_user_pref():
         if not val:
             continue
         all_prefs[pref_class.get_url_param_name()] = val
-    if not all_prefs:
-        return json.dumps({"msg": "success; no-op"})
+
+    if not all_prefs or (len(all_prefs) == 1 and all_prefs.get(np.GenderPref.get_url_param_name(), None)):
+        resp = {"msg": "success; no-op"}
+        return json.dumps(resp) if not func_call else resp
 
     parsed_prefs = np.str_dict_to_class_dict(all_prefs)
     redis_lib.update_user_pref(session_id, parsed_prefs)
 
-    return json.dumps({"msg": "success"})
+    resp = {"msg": "success"}
+    return json.dumps({"msg": "success"}) if not func_call else resp
 
 
 @app.route("/babyname/get_user_pref")
@@ -227,7 +227,7 @@ def get_user_pref():
 
 
 @app.route("/babyname/update_user_sentiments")
-def update_user_sentiments(raise_on_missing_param=True):
+def update_user_sentiments(func_call=False):
     """
     expect an input JSON like
     {
@@ -243,14 +243,16 @@ def update_user_sentiments(raise_on_missing_param=True):
 
     sentiments_str = request.args.get(np.UserSentiments.get_url_param_name(), default="", type=str)
     if not sentiments_str:
-        if raise_on_missing_param:
-            abort(400, "missing user sentiments in request")
-        else:
+        if func_call:
             return json.dumps({"msg": "success; no-op"})
+        else:
+            abort(400, "missing user sentiments in request")
 
     sentiments_inst = np.UserSentiments.create(sentiments_str)
     redis_lib.update_user_sentiments(session_id, sentiments_inst)
-    return json.dumps({"msg": "success"})
+
+    resp = {"msg": "success"}
+    return json.dumps(resp) if not func_call else resp
 
 
 @app.route("/babyname/get_name_sentiments")
