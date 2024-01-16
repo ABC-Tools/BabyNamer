@@ -1,8 +1,10 @@
 import json
+import logging
 import os
 
 from typing import Dict, Tuple, List, Any
 from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir
+import app.lib.name_statistics as ns
 
 
 class NameMeaning:
@@ -15,20 +17,10 @@ class NameMeaning:
         name = canonicalize_name(raw_name)
         gender = canonicalize_gender(raw_gender)
 
-        # if the request provide gender, try to use it; if not, try without gender
-        if gender:
-            result = self.__name_meaning__.get((name, gender), '')
-            if not result:
-                result = self.__name_meaning__.get((name, None), '')
-            return result
+        if not gender:
+            gender = ns.NAME_STATISTICS.guess_gender(name)
 
-        # try different genders
-        result = self.__name_meaning__.get((name, None), '')
-        if not result:
-            result = self.__name_meaning__.get((name, Gender.GIRL), '')
-        if not result:
-            result = self.__name_meaning__.get((name, Gender.BOY), '')
-        return result
+        return self.__name_meaning__[gender].get(name, '')
 
     @staticmethod
     def load_file() -> List[Dict[str, Any]]:
@@ -59,7 +51,10 @@ class NameMeaning:
         """
         returns a dict with key of (name, gender), and with the value of meaning of the name
         """
-        result = {}
+        result = {
+            Gender.BOY: {},
+            Gender.GIRL: {}
+        }
         for name_dict in name_list:
             # there is one JSON dictionary in each element
             raw_name = list(name_dict.keys())[0]
@@ -67,10 +62,15 @@ class NameMeaning:
 
             name = canonicalize_name(raw_name)
             gender = canonicalize_gender(val_dict.get('gender', ''))
+            if not gender:
+                gender = ns.NAME_STATISTICS.guess_gender(name)
             description = val_dict.get('description', '')
 
-            result[(name, gender)] = description
+            result[gender][name] = description
 
+        logging.debug('Name_meaning loaded {} boy names and {} girl names'.format(
+            len(result[Gender.BOY]), len(result[Gender.GIRL])
+        ))
         return result
 
     @staticmethod

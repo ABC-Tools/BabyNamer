@@ -159,7 +159,7 @@ def get_name_proposal_reason_key(session_id):
     return 'proposal-reason-{}'.format(session_id)
 
 
-def update_name_proposal(session_id: str, proposals: List[str], update_job_que=True):
+def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Dict[str, str], update_job_que=True):
     if not proposals:
         return
 
@@ -169,6 +169,11 @@ def update_name_proposal(session_id: str, proposals: List[str], update_job_que=T
     proposal_key = get_name_proposals_key(session_id)
     pipeline.rpush(proposal_key, *proposals)
     pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
+
+    if name_reasons:
+        proposal_reason_key = get_name_proposal_reason_key(session_id)
+        pipeline.hset(proposal_reason_key, mapping=name_reasons)
+        pipeline.expire(proposal_reason_key, time=TWO_WEEKS_IN_SECONDS)
 
     # set last updated timestamp
     last_proposal_time_key = get_last_proposal_time_key(session_id)

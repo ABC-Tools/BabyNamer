@@ -6,7 +6,7 @@ import time
 import scipy.stats as stats
 
 from typing import Dict, Tuple, List, Any, Union
-from app.lib.common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir,\
+from app.lib.common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir, \
     float_to_percentage, percentage_to_float
 import app.lib.name_statistics as ns
 
@@ -107,19 +107,15 @@ class NameRating:
             }
         return result
 
-    def suggest(self, raw_target_gender: Union[str, Gender], options: Dict[str, str], count=20)\
-            -> Tuple[Dict[str, float], Dict[str, str]]:
+    def suggest(self, raw_target_gender: Union[str, Gender], options: Dict[str, str], count=20) \
+            -> Dict[str, float]:
         start_ts = time.time()
         suggest_name_scores = self._suggest1(raw_target_gender, options, count=count)
         logging.debug('time spent for suggesting names: {} seconds'.format(time.time() - start_ts))
 
-        suggest_name_reasons = self._create_suggest_reason(raw_target_gender,
-                                                           list(suggest_name_scores.keys()),
-                                                           options)
+        return suggest_name_scores
 
-        return suggest_name_scores, suggest_name_reasons
-
-    def _create_suggest_reason(self, raw_target_gender: str, names: List[str], options: Dict[str, str])\
+    def create_suggest_reason(self, raw_target_gender: str, names: List[str], options: Dict[str, str]) \
             -> Dict[str, str]:
         target_gender = canonicalize_gender(raw_target_gender)
         if not target_gender:
@@ -140,22 +136,21 @@ class NameRating:
                 continue
 
             for name in names:
-                zscore = self._get_zscore(target_gender, name, url_param, opt1, opt2, choice)
-                percentile = float_to_percentage(stats.norm.sf(abs(zscore)), min_val=1)
-                """
-                logging.debug('percentile for {name} for {choice} is {direction} {percentile}'.format(
-                    name=name, choice=choice, direction='top' if zscore > 0 else 'bottom', percentile=percentile
+                percentile = self._get_percentile(target_gender, name, url_param, opt1, opt2, choice)
+                percentile_str = float_to_percentage(percentile, min_val=1)
+
+                logging.debug('percentile for {name} for {choice} is {percentile}'.format(
+                    name=name, choice=choice, percentile=percentile_str
                 ))
-                """
-                if zscore > 0.25:
+                if percentile < 0.4:
                     name_reasons[name]['pros'].append(
-                        f'the top {percentile} {choice} names'.format(
-                            percentile=percentile, choice=choice
+                        'the top {percentile} {choice} names'.format(
+                            percentile=percentile_str, choice=choice
                         )
                     )
-                elif zscore < -0.25:
+                elif percentile > 0.6:
                     name_reasons[name]['cons'].append(
-                        f'{choice}'.format(choice=choice)
+                        '{choice}'.format(choice=choice)
                     )
 
         name_reason_sentences = {name: '' for name in names}
@@ -167,12 +162,12 @@ class NameRating:
                 name_reason_sentences[name] = 'This name is considered as {}.'.format(', '.join(pros))
                 if cons:
                     name_reason_sentences[name] = \
-                        '{original} However, the name is usually considered as not {cons}.'.\
+                        '{original} However, the name is usually considered as not {cons}.'. \
                             format(original=name_reason_sentences[name], cons=', '.join(cons))
 
         return name_reason_sentences
 
-    def _suggest1(self, raw_target_gender: str, options: Dict[str, str], count=20, cap_zscore=2.0)\
+    def _suggest1(self, raw_target_gender: str, options: Dict[str, str], count=20, cap_zscore=2.0) \
             -> Dict[str, float]:
         target_gender = canonicalize_gender(raw_target_gender)
         if not target_gender:
@@ -198,12 +193,12 @@ class NameRating:
                 continue
 
             for name in name_score_dict.keys():
-                zscore = self._get_zscore(target_gender, name, url_param, opt1, opt2, choice)
-                # Cap zscore to prevent 1 dimension to dominate
-                adjusted_zscore = max(min(zscore, cap_zscore), -cap_zscore)
-                name_score_dict[name] += adjusted_zscore
+                percentile = self._get_percentile(target_gender, name, url_param, opt1, opt2, choice)
+                name_score_dict[name] += 1 - percentile
 
-        name_score_list = [(name, score) for name, score in name_score_dict.items() if score > 1.0]
+        num_choices = len(options)
+        name_score_list = [(name, score / num_choices) for name, score in name_score_dict.items()
+                           if score > 0.5 * num_choices]
         name_score_list = sorted(name_score_list, key=lambda x: x[1], reverse=True)
 
         count = min(count, len(name_score_list))
@@ -239,6 +234,14 @@ class NameRating:
         logging.info('Total: {}, count of names with >=50%: {}, percentage: {}'.format(
             total, count, percentage
         ))
+
+    def _get_percentile(self, gender: Union[Gender, str], name: str,
+                        url_param: str, ext_option1: str, ext_option2: str,
+                        option_choice: str) -> float:
+        gender = canonicalize_gender(gender)
+        zscore = self._get_zscore(gender, name, url_param, ext_option1, ext_option2, option_choice)
+        percentile = stats.norm.sf(abs(zscore))
+        return percentile if zscore > 0 else 1 - percentile
 
     def _get_zscore(self, gender: Gender, name: str,
                     url_param: str, ext_option1: str, ext_option2: str,

@@ -50,3 +50,9 @@ $ sudo Python (sudo is required for disk access)
 
 ### Python type cheat sheet
 https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html
+
+
+### set logging level in Python shell
+```commandline
+>>> logging.getLogger().setLevel(logging.DEBUG)
+```

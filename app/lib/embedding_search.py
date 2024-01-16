@@ -43,16 +43,24 @@ class FaissSearch:
         name = canonicalize_name(name)
         return self._name_embedding_dict[gender].get(name, [])
 
-    def similar_names(self, gender: Union[str, Gender], name: str, num_of_result=10):
+    def similar_names(self, gender: Union[str, Gender],
+                      name: str,
+                      target_gender: Union[str, Gender] = None,
+                      num_of_result=10) -> Dict[str, float]:
         gender = canonicalize_gender(gender)
+        target_gender = canonicalize_gender(target_gender)
         name = canonicalize_name(name)
         embedding = self._name_embedding_dict[gender].get(name, [])
         if not embedding:
             return []
 
-        result = self.search_with_embedding(gender, embedding, num_of_result + 1)
-        # the first one is always the intput name itself
-        return result[1:]
+        if target_gender and target_gender != gender:
+            # search for similar names as siblings
+            return self.search_with_embedding(target_gender, embedding, num_of_result)
+        else:
+            result = self.search_with_embedding(gender, embedding, num_of_result + 1)
+            del result[name]
+            return result
 
     def search_with_embedding(self, gender: Gender, embedding: List[float], num_of_result=10)\
             -> Dict[str, float]:
@@ -74,7 +82,8 @@ class FaissSearch:
         name_list = [x['name'] for x in name_embedding_list]
         embedding_list = [x['embedding'] for x in name_embedding_list]
         name_embedding_dict = {x['name']: x['embedding'] for x in name_embedding_list}
-        embedding_index = faiss.IndexFlatL2(len(embedding_list[0]))
+        # embedding_index = faiss.IndexFlatL2(len(embedding_list[0]))
+        embedding_index = faiss.IndexFlatIP(len(embedding_list[0]))
         embedding_index.add(np.asarray(embedding_list))
         logging.debug('loaded index for {}; is_trained: {}, ntotal: {}'.format(
             str(gender), embedding_index.is_trained, embedding_index.ntotal))
