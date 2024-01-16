@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from app.lib.common import Gender
 
@@ -102,7 +102,7 @@ def choose_names(suggest_names_from_option,
                  suggested_names_from_text,
                  suggested_names_from_siblings,
                  suggested_names_from_popularity,
-                 count=50) -> List[(str, float)]:
+                 count=50) -> List[Tuple[str, float]]:
     norm_suggest_names_from_option = distance_to_normalized_score(suggest_names_from_option)
     norm_suggested_names_from_text = distance_to_normalized_score(suggested_names_from_text)
     norm_suggested_names_from_siblings = distance_to_normalized_score(suggested_names_from_siblings)
@@ -216,7 +216,9 @@ def get_name_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> List[np.PrefI
     return result
 
 
-def filter_using_name_pref(gender: Gender, name_score_list: List[(str, float)], name_prefs: List[np.PrefInterface]):
+def filter_using_name_pref(gender: Gender,
+                           name_score_list: List[Tuple[str, float]],
+                           name_prefs: List[np.PrefInterface]):
     names_to_avoid = set()
 
     for pref in name_prefs:

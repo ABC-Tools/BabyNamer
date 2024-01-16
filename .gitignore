@@ -1,3 +1,8 @@
+.DS_Store
+
+# big files
+name_embedding*.txt
+
 .idea/
 
 # Byte-compiled / optimized / DLL files
@@ -7,9 +12,6 @@ __pycache__/
 
 # C extensions
 *.so
-
-# big files
-name_embedding*.txt
 
 # Distribution / packaging
 .Python
