@@ -140,6 +140,9 @@ p{
 .navbar-toggler-icon{
     font-size: 30px;
 }
+nav img {
+    width: 100px;
+}
 
 .centred {
     height: 250px;

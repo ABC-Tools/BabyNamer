@@ -40,8 +40,8 @@ def handle_error(e):
 
 @app.route("/")
 def index():
-    # return flask.render_template('home.html')
-    return 'success'
+    return flask.render_template('index.html')
+    # return 'success'
 
 
 @app.route("/babyname/name_facts")
