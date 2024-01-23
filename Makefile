@@ -20,6 +20,7 @@ venv/bin/activate: requirements.txt
 # run all tests
 # to run single tests: ./venv/bin/python3 -m unittest -v test.test_abc.TestABC_Py
 test: venv/bin/activate
+	./venv/bin/pip install -r test_requirements.txt
 	./venv/bin/python3 -m unittest
 
 clean:

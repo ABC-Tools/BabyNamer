@@ -28,8 +28,9 @@ ALL_RATINGS = [
     ("Nerdy", "Unintellectual", 'intellectual_option', "Intellectual", "Modest")
 ]
 
-DISPLAY_RATINGS = {"Classic", "Mature", "Formal", "Noble", "Urban", "Wholesome", "Strong", "Refined", "Creative",
-                   "Simple", "Serious", "Intellectual"}
+DISPLAY_RATINGS = {"style_option", "maturity_option", "formality_option", "class_option",
+                   "environment_option", "moral_option", "strength_option", "texture_option",
+                   "creativity_option", "complexity_option", "tone_option", "intellectual_option"}
 
 RATING_DISTRIBUTION = {
     Gender.BOY: {
@@ -77,6 +78,35 @@ class NameRating:
             Gender.BOY: [name for name in self.__name_rating__[Gender.BOY].keys()],
             Gender.GIRL: [name for name in self.__name_rating__[Gender.GIRL].keys()]
         }
+
+    def get_feature_scores(self, raw_name: str, raw_gender: Union[str, Gender]) \
+            -> Dict[str, Dict[str, Union[List[str], int]]]:
+        name = canonicalize_name(raw_name)
+        gender = canonicalize_gender(raw_gender)
+        if not gender:
+            gender = ns.NAME_STATISTICS.guess_gender(name)
+
+        if name not in self.__name_rating__[gender]:
+            return {}
+
+        result = {}
+        for types in ALL_RATINGS:
+            url_param = types[2]
+            ext_opt1 = types[3]
+            ext_opt2 = types[4]
+            if url_param not in DISPLAY_RATINGS:
+                continue
+
+            zscore = self._get_zscore(gender, name, url_param, ext_opt1, ext_opt2, ext_opt1)
+            percentile_float = stats.norm.sf(abs(zscore))
+            percentile_float = percentile_float if zscore > 0 else 1 - percentile_float
+            score = round(percentile_float * 10)
+
+            result[url_param] = {
+                'characteristics': [ext_opt1, ext_opt2],
+                'score': score
+            }
+        return result
 
     def get_feature_percentiles(self, raw_name: str, raw_gender: Union[str, Gender]) -> Dict:
         name = canonicalize_name(raw_name)
@@ -139,9 +169,6 @@ class NameRating:
                 percentile = self._get_percentile(target_gender, name, url_param, opt1, opt2, choice)
                 percentile_str = float_to_percentage(percentile, min_val=1)
 
-                logging.debug('percentile for {name} for {choice} is {percentile}'.format(
-                    name=name, choice=choice, percentile=percentile_str
-                ))
                 if percentile < 0.4:
                     name_reasons[name]['pros'].append(
                         'the top {percentile} {choice} names'.format(

@@ -82,7 +82,7 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
     formatted_prefs = []
     for pref in user_prefs_dict.values():
         if isinstance(pref, np.GenderPref) or isinstance(pref, np.MotherName) \
-                or isinstance(pref, np.FatherName) or isinstance(pref, np.NameStyle):
+                or isinstance(pref, np.FatherName):
             pref_str = '{meaning}: {value}.'.format(meaning=pref.__class__.get_pref_meaning(),
                                                     value=pref.get_val_str())
             formatted_prefs.append(pref_str)
@@ -104,6 +104,9 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
             names_str = ', '.join(pref.get_val())
             pref_str = '{meaning}: {value}.'.format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
             formatted_prefs.append(pref_str)
+        elif isinstance(pref, np.OtherPref):
+            pref_str = 'Other info user provided: {value}.'.format(value=pref.get_val())
+            formatted_prefs.append(pref_str)
         elif isinstance(pref, np.StyleChoice) or isinstance(pref, np.MaturityChoice) or \
                 isinstance(pref, np.FormalityChoice) or isinstance(pref, np.ClassChoice) or \
                 isinstance(pref, np.EnvironmentChoice) or isinstance(pref, np.MoralChoice) or \
@@ -111,11 +114,6 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
                 isinstance(pref, np.CreativityChoice) or isinstance(pref, np.ComplexityChoice) or \
                 isinstance(pref, np.ToneChoice) or isinstance(pref, np.IntellectualChoice):
             choice = pref.get_val_str()
-            opt1, opt2 = pref.__class__.get_possible_vals()
-            if choice == opt1:
-                other_choice = opt2
-            else:
-                other_choice = opt1
             pref_str = '{meaning}: user prefers {choice} names.'.format(
                 meaning=pref.__class__.get_pref_meaning(), choice=choice)
             formatted_prefs.append(pref_str)

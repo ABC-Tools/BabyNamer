@@ -8,6 +8,7 @@ The name fondness is stored in their own hash in redis, which can be updated eas
 - map value: reason
 """
 import json
+import logging
 import time
 import os
 import redis
@@ -71,6 +72,7 @@ def get_user_pref(session_id: str):
 
     # convert general preferences
     raw_general_pref = responses[0]
+    logging.debug('raw_general_pref from redis: {}'.format(raw_general_pref))
     all_prefs = np.str_dict_to_class_dict(raw_general_pref)
 
     return all_prefs
@@ -116,7 +118,7 @@ def get_user_sentiments(session_id: str) -> np.UserSentiments:
     # Parse and add NameSentiments preference
     raw_user_sentiments = responses[0]
     if not raw_user_sentiments:
-        return None
+        return np.UserSentiments.create_from_dict({})
 
     # Parse the dictionary string
     name_sentiments_dict = {}

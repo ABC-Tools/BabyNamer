@@ -18,6 +18,7 @@ from app.lib import name_pref as np
 from app.lib import session_id as sid
 from app.lib import origin_and_short_meaning as osm
 from app.lib.common import canonicalize_gender, canonicalize_name
+from app.lib import name_rating as nr
 
 import app.procedure.suggest_names as suggest_names
 
@@ -81,10 +82,12 @@ def get_name_facts():
         abort(400, 'Missing name parameter')
     name = canonicalize_name(name)
 
-    valid_male_gender = ['male', 'boy']
-    valid_female_gender = ['female', 'girl']
-    if gender and gender.lower() not in valid_male_gender and gender.lower() not in valid_female_gender:
+    try:
+        gender = canonicalize_gender(gender)
+    except ValueError as e:
         abort(400, 'Invalid gender: {}'.format(gender))
+    if not gender:
+        gender = ns.NAME_STATISTICS.guess_gender(name)
 
     origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
     trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
@@ -92,6 +95,7 @@ def get_name_facts():
     similar_names = sn.SIMILAR_NAMES.get(name, gender)
 
     output = {
+        'gender': str(gender),
         'origin': origin,
         'short_meaning': short_meaning,
         'meaning': meaning,
@@ -108,6 +112,14 @@ def get_name_facts():
     sentiment_dict = redis_lib.get_sentiment_for_name(session_id, name)
     if sentiment_dict:
         output[np.UserSentiments.get_url_param_name()] = sentiment_dict
+
+    _, rank = ns.NAME_STATISTICS.get_frequency_and_rank(name, gender)
+    if rank < 100000:
+        output['rank'] = rank
+
+    feature_scores = nr.NAME_RATING.get_feature_scores(name, gender)
+    if feature_scores:
+        output['features'] = feature_scores
 
     return jsonify(output)
 

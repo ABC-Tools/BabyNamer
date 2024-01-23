@@ -2,7 +2,7 @@ import json
 import logging
 import os
 
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Any, Union
 from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir
 import app.lib.name_statistics as ns
 
@@ -13,7 +13,7 @@ class NameMeaning:
         raw_input = NameMeaning.load_file()
         self.__name_meaning__ = NameMeaning.loaded_list_to_dict(raw_input)
 
-    def get(self, raw_name: str, raw_gender: str = None) -> str:
+    def get(self, raw_name: str, raw_gender: Union[str, Gender] = None) -> str:
         name = canonicalize_name(raw_name)
         gender = canonicalize_gender(raw_gender)
 
