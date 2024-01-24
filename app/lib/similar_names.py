@@ -2,7 +2,7 @@ import json
 import os
 import logging
 
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Any, Union
 from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root_dir
 import app.lib.name_statistics as ns
 
@@ -11,7 +11,7 @@ class SimilarNames:
     def __init__(self):
         self.__similar_names__ = SimilarNames.load_file()
 
-    def get(self, raw_name: str, raw_gender: str = None) -> List[str]:
+    def get(self, raw_name: str, raw_gender: Union[str, Gender] = None) -> List[str]:
         name = canonicalize_name(raw_name)
         gender = canonicalize_gender(raw_gender)
         if gender:

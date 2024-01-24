@@ -6,6 +6,27 @@ from app.lib.common import Gender
 
 class TestNameRating(unittest.TestCase):
 
+    def test_get_feature_scores(self):
+        feature_scores = nr.NAME_RATING.get_feature_scores('Kaitlyn', 'girl')
+        self.assertTrue('style_option' in feature_scores)
+        self.assertTrue(feature_scores['style_option']['characteristics'] == ['Classic', 'Modern'])
+        self.assertTrue(feature_scores['style_option']['score'] == 10)
+
+        self.assertTrue('maturity_option' in feature_scores)
+        self.assertTrue('formality_option' in feature_scores)
+        self.assertTrue('class_option' in feature_scores)
+        self.assertTrue('environment_option' in feature_scores)
+        self.assertTrue('moral_option' in feature_scores)
+        self.assertTrue('strength_option' in feature_scores)
+        self.assertTrue('texture_option' in feature_scores)
+        self.assertTrue('creativity_option' in feature_scores)
+        self.assertTrue('complexity_option' in feature_scores)
+        self.assertTrue('tone_option' in feature_scores)
+        self.assertTrue('intellectual_option' in feature_scores)
+
+        self.assertTrue('overall_option' not in feature_scores)
+        self.assertTrue('gender_option' not in feature_scores)
+
     def test_suggest(self):
         option = {'style_option': 'Classic', 'texture_option': 'Refined'}
 

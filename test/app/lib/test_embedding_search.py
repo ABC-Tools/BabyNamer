@@ -1,6 +1,7 @@
 import json
 import unittest
 import os
+import numpy as np
 
 import app.lib.embedding_search as es
 from app.lib.common import Gender
@@ -27,6 +28,20 @@ class TestFaissSearch(unittest.TestCase):
         # print('description: {}'.format(description))
         self.assertTrue('France' in description or 'French' in description,
                         'The description has no keyword of either France or French: {}'.format(description))
+
+    def test_similar_names(self):
+        result = es.FAISS_SEARCH.similar_names('girl', 'Kaitlyn')
+        print(result)
+
+        first_name = next(iter(result.keys()))
+        self.assertTrue(first_name != 'Kaitlyn')
+
+        eb1 = es.FAISS_SEARCH.get_embeddings('girl', 'Kaitlyn')
+        eb2 = es.FAISS_SEARCH.get_embeddings('girl', first_name)
+        self.assertTrue(np.dot(eb1, eb2) > 0.7,
+                        'the similarity of two similar names ({} and {}) is smaller than 0.5'.format(
+                            'Kaitlyn', first_name
+                        ))
 
 
 if __name__ == '__main__':

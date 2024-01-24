@@ -31,7 +31,7 @@ class NameStatistics:
             gender = self.guess_gender(name)
 
         return self._name_freq_3_year[gender].get(name, {}).get('freq', 0), \
-               self._name_freq_3_year[gender].get(name, {}).get('rank', 10000)
+               self._name_freq_3_year[gender].get(name, {}).get('rank', 100000)
 
     def get_popular_names(self, raw_gender: Union[str, Gender], count=30):
         if isinstance(raw_gender, Gender):
@@ -61,7 +61,7 @@ class NameStatistics:
         logging.debug('{} of names has a count of {} out of {}: {}'.format(len(names), count, total, names))
         return names
 
-    def get_yearly_trend(self, raw_name: str, raw_gender: str = None) -> Dict[str, str]:
+    def get_yearly_trend(self, raw_name: str, raw_gender: Union[str, Gender] = None) -> Dict[str, str]:
         """
         return a dict with year as key and with frequency as value
         """

@@ -8,6 +8,7 @@ The name fondness is stored in their own hash in redis, which can be updated eas
 - map value: reason
 """
 import json
+import logging
 import time
 import os
 import redis
@@ -71,6 +72,7 @@ def get_user_pref(session_id: str):
 
     # convert general preferences
     raw_general_pref = responses[0]
+    logging.debug('raw_general_pref from redis: {}'.format(raw_general_pref))
     all_prefs = np.str_dict_to_class_dict(raw_general_pref)
 
     return all_prefs
@@ -116,7 +118,7 @@ def get_user_sentiments(session_id: str) -> np.UserSentiments:
     # Parse and add NameSentiments preference
     raw_user_sentiments = responses[0]
     if not raw_user_sentiments:
-        return None
+        return np.UserSentiments.create_from_dict({})
 
     # Parse the dictionary string
     name_sentiments_dict = {}
@@ -167,6 +169,7 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
 
     # set proposed names
     proposal_key = get_name_proposals_key(session_id)
+    pipeline.delete(proposal_key)
     pipeline.rpush(proposal_key, *proposals)
     pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
 
@@ -183,7 +186,8 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
     if update_job_que:
         pipeline.rpush(PROPOSAL_REASON_JOB_QUEUE_KEY, session_id)
         pipeline.expire(PROPOSAL_REASON_JOB_QUEUE_KEY, time=TWO_WEEKS_IN_SECONDS)
-
+        logging.debug('Writing job with session id {} to job queue: {}'.format(
+            session_id, PROPOSAL_REASON_JOB_QUEUE_KEY))
     pipeline.execute()
 
 
@@ -211,6 +215,11 @@ def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], c
 def get_proposal_reason_for_name(session_id, name) -> str:
     proposal_key = get_name_proposal_reason_key(session_id)
     return redis_client.hget(proposal_key, name)
+
+
+def get_proposal_reasons(session_id) -> Dict[str, str]:
+    proposal_key = get_name_proposal_reason_key(session_id)
+    return redis_client.hgetall(proposal_key)
 
 
 def get_last_proposal_time(session_id) -> int:
