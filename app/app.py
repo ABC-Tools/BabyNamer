@@ -20,7 +20,7 @@ from app.lib import origin_and_short_meaning as osm
 from app.lib.common import canonicalize_gender, canonicalize_name
 from app.lib import name_rating as nr
 
-import app.procedure.suggest_names as suggest_names
+import app.procedure.suggest_names as suggest_names_proc
 
 app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -158,8 +158,8 @@ def suggest_names():
         if last_proposals:
             return jsonify(last_proposals)
 
-    suggested_names = suggest_names.suggest(session_id, gender)
-
+    suggested_names = suggest_names_proc.suggest(session_id, gender)
+    logging.info('Final suggested names are: {}'.format(suggested_names))
     return jsonify(suggested_names)
 
 

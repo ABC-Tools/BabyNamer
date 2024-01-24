@@ -11,6 +11,7 @@ import asyncio
 import tiktoken
 import openai
 
+from app.lib.common import fprint
 import app.lib.redis as redis_lib
 import app.openai_lib.prompt as prompt
 import app.lib.name_pref as np
@@ -23,11 +24,12 @@ client = openai.AsyncOpenAI(api_key='sk-SstZvQFjSdmCQ09SnJR3T3BlbkFJpS0iBDHE59sr
 
 
 def main_loop():
-    print('background worker starts...')
+    logging.info('background worker starts...')
     while True:
-        key, session_id = redis_lib.redis_client.blpop(
-            redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY, timeout=15 * 60)
-        if session_id:
+        blpop_val = redis_lib.redis_client.blpop(
+            redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY, timeout=1 * 60)
+        if blpop_val:
+            key, session_id = blpop_val
             asyncio.run(handle_job(session_id))
         else:
             logging.info('Live pulse from background worker')
@@ -36,25 +38,25 @@ def main_loop():
 async def handle_job_with_exception(session_id):
     try:
         start_ts = time.time()
-        logging.info('Start to process the job for {}'.format(session_id))
+        fprint('Start to process the job for {}'.format(session_id))
         await handle_job(session_id)
-        logging.info('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
+        fprint('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
 
         raise ValueError('test')
     except Exception as e:
         logging.exception(e, exc_info=True)
-        logging.error('Failed to handle job for {}'.format(session_id))
+        fprint('Failed to handle job for {}'.format(session_id))
 
 
 async def handle_job(session_id):
     proposed_names = redis_lib.get_name_proposals(session_id)
     if not proposed_names:
-        logging.warning('Missing proposed names for the job with session id {}'.format(session_id))
+        fprint('Missing proposed names for the job with session id {}'.format(session_id))
         return
 
     gender, user_context = create_user_description(session_id)
     if not gender:
-        logging.warning("Missing gender information for {}".format(session_id))
+        fprint("Missing gender information for {}".format(session_id))
         return
 
     name_descriptions = create_name_descriptions(gender, proposed_names)

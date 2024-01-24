@@ -169,6 +169,7 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
 
     # set proposed names
     proposal_key = get_name_proposals_key(session_id)
+    pipeline.delete(proposal_key)
     pipeline.rpush(proposal_key, *proposals)
     pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
 
@@ -185,7 +186,8 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
     if update_job_que:
         pipeline.rpush(PROPOSAL_REASON_JOB_QUEUE_KEY, session_id)
         pipeline.expire(PROPOSAL_REASON_JOB_QUEUE_KEY, time=TWO_WEEKS_IN_SECONDS)
-
+        logging.debug('Writing job with session id {} to job queue: {}'.format(
+            session_id, PROPOSAL_REASON_JOB_QUEUE_KEY))
     pipeline.execute()
 
 
@@ -213,6 +215,11 @@ def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], c
 def get_proposal_reason_for_name(session_id, name) -> str:
     proposal_key = get_name_proposal_reason_key(session_id)
     return redis_client.hget(proposal_key, name)
+
+
+def get_proposal_reasons(session_id) -> Dict[str, str]:
+    proposal_key = get_name_proposal_reason_key(session_id)
+    return redis_client.hgetall(proposal_key)
 
 
 def get_last_proposal_time(session_id) -> int:

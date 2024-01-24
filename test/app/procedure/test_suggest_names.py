@@ -127,7 +127,7 @@ class TestSuggestNames(unittest.TestCase):
             reason = redis_lib.get_proposal_reason_for_name('67890', 'Liam')
             self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
 
-            # suggestion from similar names
+            # suggestion from text
             reason = redis_lib.get_proposal_reason_for_name('67890', 'Jules')
             self.assertTrue(not reason)
 

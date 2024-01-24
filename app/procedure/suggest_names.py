@@ -52,6 +52,8 @@ def suggest(session_id, gender: Gender, count=50):
     name_prefs = get_name_pref(user_prefs_dict)
     final_name_score_list = filter_using_name_pref(gender, name_score_list, name_prefs)
     final_names = [name for name, score in final_name_score_list]
+    max_count = count if len(final_names) > count else len(final_names)
+    final_names = final_names[0:max_count]
 
     # generate recommendation reasons
     names_from_options = set(suggest_names_from_option).intersection(final_names)
