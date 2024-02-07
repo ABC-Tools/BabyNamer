@@ -131,6 +131,46 @@ class TestSuggestNames(unittest.TestCase):
             reason = redis_lib.get_proposal_reason_for_name('67890', 'Jules')
             self.assertTrue(not reason)
 
+    def test_filter_out_name_from_sentiments(self):
+        filename = os.path.join(get_test_root_dir(), 'app', 'lib', 'data', 'eb_i_like_french_name.json')
+        with open(filename, 'r') as fp:
+            eb = json.load(fp)
+
+        with patch('app.openai_lib.embedding_client.client', spec=True) as mock_client:
+            mock_client.embeddings = MagicMock()
+
+            resp_mock = MagicMock()
+            mock_client.embeddings.create.return_value = resp_mock
+
+            resp_mock.data = [MagicMock()]
+            resp_mock.data[0].embedding = eb
+
+            other_pref = np.OtherPref.create('I like France')
+            sibling_pref = np.SiblingNames.create('["Francis"]')
+            redis_lib.update_user_pref('67891',
+                                       {np.OtherPref.get_url_param_name(): other_pref,
+                                        np.SiblingNames.get_url_param_name(): sibling_pref})
+
+            sentiments = np.UserSentiments.create(
+                json.dumps(
+                    {
+                        "Liam": {"sentiment": "liked", "reason": "sounds good"},
+                        "Pascal": {"sentiment": "disliked", "reason": "my neighbor uses this name"},
+                        "Claude": {"sentiment": "saved"}
+                    }
+                )
+            )
+            redis_lib.update_user_sentiments('67891', sentiments)
+
+            names = sn.suggest('67891', Gender.BOY)
+            print('Suggested names: {}'.format(names))
+
+            self.assertTrue('Liam' not in names)
+            self.assertTrue('Jules' in names)
+            self.assertTrue('Pascal' not in names)
+            self.assertTrue('Claude' not in names)
+            self.assertTrue('Francis' not in names)
+
     def test_name_letter_similarity(self):
         score = sn.letter_wise_similarity('Kaitlyn', 'Katie')
         self.assertTrue(score >= 0.8,
