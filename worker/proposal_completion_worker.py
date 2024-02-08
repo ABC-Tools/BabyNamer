@@ -25,15 +25,16 @@ client = openai.AsyncOpenAI(api_key='sk-SstZvQFjSdmCQ09SnJR3T3BlbkFJpS0iBDHE59sr
 
 redis_host = os.environ.get("REDISHOST", "10.49.86.211")
 redis_port = int(os.environ.get("REDISPORT", 6379))
-redis_client = redis_async.StrictRedis(host=redis_host, port=redis_port, charset="utf-8", decode_responses=True)
 
 pending_task_count = 0
 
 
 async def main_loop():
+    redis_client = await redis_async.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
+
     logging.info('background worker starts...')
     while True:
-        blpop_val = redis_client.blpop(
+        blpop_val = await redis_client.blpop(
             redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY, timeout=1 * 60)
         if blpop_val:
             key, session_id = blpop_val
@@ -43,18 +44,19 @@ async def main_loop():
                 ))
                 continue
 
-            asyncio.create_task(handle_job(session_id))
+            asyncio.create_task(handle_job_with_exception(session_id))
         else:
             logging.info('Live pulse from background worker. And number of active tasks: {}'
                          .format(pending_task_count))
 
 
 async def handle_job_with_exception(session_id):
+    global pending_task_count
     pending_task_count += 1
     try:
         start_ts = time.time()
         logging.debug('Start to process the job for {}'.format(session_id))
-        handle_job(session_id)
+        await handle_job(session_id)
         logging.debug('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
 
         pending_task_count -= 1
@@ -81,9 +83,10 @@ async def handle_job(session_id):
     request_num = (len(proposed_names) // group_size) + (1 if (len(proposed_names) % group_size) else 0)
     futures = []
     for i in range(request_num):
+        task_names = proposed_names[(i * group_size):((i+1) * group_size)]
         futures.append(
             asyncio.create_task(
-                send_one_request(session_id, gender, user_context, proposed_names[i * group_size:i * (group_size+1)]))
+                send_one_request(session_id, gender, user_context, task_names))
         )
     await asyncio.gather(*futures, return_exceptions=True)
 
