@@ -41,7 +41,7 @@ def handle_error(e):
 
 @app.route("/")
 def index():
-    return flask.render_template('index.html')
+    return flask.render_template('mainpage.html')
     # return 'success'
 
 
