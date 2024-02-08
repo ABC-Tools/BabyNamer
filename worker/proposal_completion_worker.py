@@ -7,11 +7,12 @@ import logging
 import time
 from typing import List
 import asyncio
+import os
 
 import tiktoken
 import openai
+import redis.asyncio as redis_async
 
-from app.lib.common import fprint
 import app.lib.redis as redis_lib
 import app.openai_lib.prompt as prompt
 import app.lib.name_pref as np
@@ -22,54 +23,93 @@ import app.lib.name_meaning as nm
 tiktoken_encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
 client = openai.AsyncOpenAI(api_key='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')
 
+redis_host = os.environ.get("REDISHOST", "10.49.86.211")
+redis_port = int(os.environ.get("REDISPORT", 6379))
 
-def main_loop():
+pending_task_count = 0
+
+
+async def main_loop():
+    redis_client = await redis_async.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
+
     logging.info('background worker starts...')
     while True:
-        blpop_val = redis_lib.redis_client.blpop(
+        blpop_val = await redis_client.blpop(
             redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY, timeout=1 * 60)
         if blpop_val:
             key, session_id = blpop_val
-            asyncio.run(handle_job(session_id))
+            if pending_task_count >= 100:
+                logging.warning('Skip the task for session ({}) because of too many pending tasks: {}'.format(
+                    session_id, pending_task_count
+                ))
+                continue
+
+            asyncio.create_task(handle_job_with_exception(session_id))
         else:
-            logging.info('Live pulse from background worker')
+            logging.info('Live pulse from background worker. And number of active tasks: {}'
+                         .format(pending_task_count))
 
 
 async def handle_job_with_exception(session_id):
+    global pending_task_count
+    pending_task_count += 1
     try:
         start_ts = time.time()
-        fprint('Start to process the job for {}'.format(session_id))
+        logging.debug('Start to process the job for {}'.format(session_id))
         await handle_job(session_id)
-        fprint('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
+        logging.debug('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
 
-        raise ValueError('test')
+        pending_task_count -= 1
     except Exception as e:
         logging.exception(e, exc_info=True)
-        fprint('Failed to handle job for {}'.format(session_id))
+        logging.error('Failed to handle job for {}'.format(session_id))
+
+        pending_task_count -= 1
 
 
 async def handle_job(session_id):
     proposed_names = redis_lib.get_name_proposals(session_id)
     if not proposed_names:
-        fprint('Missing proposed names for the job with session id {}'.format(session_id))
+        logging.info('Missing proposed names for the job with session id {}'.format(session_id))
         return
 
     gender, user_context = create_user_description(session_id)
     if not gender:
-        fprint("Missing gender information for {}".format(session_id))
+        logging.error("Missing gender information for {}".format(session_id))
         return
 
+    # send requests in parallel
+    group_size = 3
+    request_num = (len(proposed_names) // group_size) + (1 if (len(proposed_names) % group_size) else 0)
+    futures = []
+    for i in range(request_num):
+        task_names = proposed_names[(i * group_size):((i+1) * group_size)]
+        futures.append(
+            asyncio.create_task(
+                send_one_request(session_id, gender, user_context, task_names))
+        )
+    await asyncio.gather(*futures, return_exceptions=True)
+
+    # check failure and print message
+    for i, future in enumerate(futures):
+        if future.exception():
+            logging.exception(future.exception(), exc_info=True)
+            logging.error('Failed to handle proposed names for session {}: {}'.format(
+                session_id, proposed_names[i * group_size:i * (group_size+1)]))
+
+
+async def send_one_request(session_id, gender, user_context, proposed_names):
     name_descriptions = create_name_descriptions(gender, proposed_names)
 
     completion_text = '''
-Write reasons why the list of names are good candidates for user's newborn, based on the user provided preference, and
-based on the descriptions of the names. Please suggest names without asking questions.
+Write reasons for every name listed in below list about why the name is good for the user's newborn, based on the user provided preference, and
+based on the descriptions of the names.
 Please provide the reasons in a JSON format. 
 
 Example response:
 {{
-  "name 1": "1~4 sentences about why this is a good name, based on the information provided by user and based on the description of the name.",
-  "name 2": "1~4 sentences about why this is a good name, based on the information provided by user and based on the description of the name.",
+  "name 1": "2~5 sentences about why this is a good name, based on the information provided by user and based on the description of the name.",
+  "name 2": "2~5 sentences about why this is a good name, based on the information provided by user and based on the description of the name.",
   ...
 }}
 
@@ -106,6 +146,7 @@ The list of names: {proposed_names}.
         resp.usage.total_tokens, int(time.time()) - start_ts))
 
     parsed_rsp = json.loads(resp.choices[0].message.content)
+    logging.debug('The response is {}'.format(parsed_rsp))
 
     redis_lib.update_name_proposal_reasons(session_id, parsed_rsp)
 
@@ -161,4 +202,4 @@ def count_tokens(text: str) -> int:
 
 
 if __name__ == "__main__":
-    main_loop()
+    asyncio.run(main_loop())
