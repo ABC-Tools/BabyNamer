@@ -38,8 +38,8 @@ def suggest(session_id, gender: Gender, count=30):
         suggested_names_from_siblings = suggest_name_using_sibling_names(gender, sibling_name_pref.get_val())
         logging.debug('suggest using sibling_name_pref: {}'.format(suggested_names_from_siblings))
 
-    # if there is no name recommendation, simply recommend names using popularity
-    name_by_popularity = ns.NAME_STATISTICS.get_popular_names(gender, count=count)
+    # Recommend names using popularity
+    name_by_popularity = ns.NAME_STATISTICS.get_popular_names(gender, count=count * 10)
     suggested_names_from_popularity = {name: 1.0 / (rank + 1) for rank, name in enumerate(name_by_popularity)}
 
     # get the ranked names based on scores
@@ -66,6 +66,8 @@ def suggest(session_id, gender: Gender, count=30):
                                               names_from_sibling_names,
                                               names_from_popularity)
 
+    # write the job to create recommendation reasons; this has to go before update_name_proposal
+    redis_lib.add_job(session_id, final_names)
     # Write a copy in redis for late references
     redis_lib.update_name_proposal(session_id, final_names, name_reasons)
 
@@ -111,8 +113,7 @@ def generate_recommend_reasons(gender: Gender,
 def choose_names(suggest_names_from_option,
                  suggested_names_from_text,
                  suggested_names_from_siblings,
-                 suggested_names_from_popularity,
-                 count=50) -> List[Tuple[str, float]]:
+                 suggested_names_from_popularity) -> List[Tuple[str, float]]:
     norm_suggest_names_from_option = normalize_scores(suggest_names_from_option)
     norm_suggested_names_from_text = normalize_scores(suggested_names_from_text)
     norm_suggested_names_from_siblings = normalize_scores(suggested_names_from_siblings)
@@ -143,8 +144,8 @@ def choose_names(suggest_names_from_option,
     result_list = sorted(result_list, key=lambda x: x[1], reverse=True)
 
     # return the result
-    num = min(len(result), count)
-    return result_list[0:num]
+    # num = min(len(result), count)
+    return result_list
 
 
 def normalize_scores(suggest_names_score_dict: Dict[str, float]) -> Dict[str, float]:

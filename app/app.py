@@ -1,3 +1,5 @@
+import time
+
 from werkzeug.exceptions import HTTPException
 
 import json
@@ -158,8 +160,11 @@ def suggest_names():
         if last_proposals:
             return jsonify(last_proposals)
 
+    start_ts = time.time()
     suggested_names = suggest_names_proc.suggest(session_id, gender)
-    logging.info('Final suggested names are: {}'.format(suggested_names))
+    logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
+    logging.debug('Final suggested names are: {}'.format(suggested_names))
+
     return jsonify(suggested_names)
 
 

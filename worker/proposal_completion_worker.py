@@ -37,41 +37,40 @@ async def main_loop():
         blpop_val = await redis_client.blpop(
             redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY, timeout=1 * 60)
         if blpop_val:
-            key, session_id = blpop_val
+            key, job_str = blpop_val
             if pending_task_count >= 100:
                 logging.warning('Skip the task for session ({}) because of too many pending tasks: {}'.format(
-                    session_id, pending_task_count
+                    job_str, pending_task_count
                 ))
                 continue
 
-            asyncio.create_task(handle_job_with_exception(session_id))
+            asyncio.create_task(handle_job_with_exception(job_str))
         else:
             logging.info('Live pulse from background worker. And number of active tasks: {}'
                          .format(pending_task_count))
 
 
-async def handle_job_with_exception(session_id):
+async def handle_job_with_exception(job_str):
     global pending_task_count
     pending_task_count += 1
     try:
         start_ts = time.time()
-        logging.debug('Start to process the job for {}'.format(session_id))
-        await handle_job(session_id)
-        logging.debug('Complete the job for {} after {} seconds'.format(session_id, time.time() - start_ts))
+        logging.debug('Start to process the job for {}'.format(job_str))
+        await handle_job(job_str)
+        logging.debug('Complete the job for {} after {} seconds'.format(job_str, time.time() - start_ts))
 
         pending_task_count -= 1
     except Exception as e:
         logging.exception(e, exc_info=True)
-        logging.error('Failed to handle job for {}'.format(session_id))
+        logging.error('Failed to handle job for {}'.format(job_str))
 
         pending_task_count -= 1
 
 
-async def handle_job(session_id):
-    proposed_names = redis_lib.get_name_proposals(session_id)
-    if not proposed_names:
-        logging.info('Missing proposed names for the job with session id {}'.format(session_id))
-        return
+async def handle_job(job_str):
+    job_info = json.loads(job_str)
+    session_id = job_info['session_id']
+    proposed_names = job_info['names']
 
     gender, user_context = create_user_description(session_id)
     if not gender:

@@ -161,8 +161,8 @@ def get_name_proposal_reason_key(session_id):
     return 'proposal-reason-{}'.format(session_id)
 
 
-def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Dict[str, str], update_job_que=True):
-    if not proposals:
+def update_name_proposal(session_id: str, proposed_names: List[str], name_reasons: Dict[str, str]):
+    if not proposed_names:
         return
 
     pipeline = redis_client.pipeline()
@@ -170,7 +170,7 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
     # set proposed names
     proposal_key = get_name_proposals_key(session_id)
     pipeline.delete(proposal_key)
-    pipeline.rpush(proposal_key, *proposals)
+    pipeline.rpush(proposal_key, *proposed_names)
     pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
 
     if name_reasons:
@@ -182,13 +182,38 @@ def update_name_proposal(session_id: str, proposals: List[str], name_reasons: Di
     last_proposal_time_key = get_last_proposal_time_key(session_id)
     pipeline.set(last_proposal_time_key, int(time.time()), ex=TWO_WEEKS_IN_SECONDS)
 
-    # Add a job in queue if needed
-    if update_job_que:
-        pipeline.rpush(PROPOSAL_REASON_JOB_QUEUE_KEY, session_id)
-        pipeline.expire(PROPOSAL_REASON_JOB_QUEUE_KEY, time=TWO_WEEKS_IN_SECONDS)
-        logging.debug('Writing job with session id {} to job queue: {}'.format(
-            session_id, PROPOSAL_REASON_JOB_QUEUE_KEY))
     pipeline.execute()
+
+
+def add_job(session_id: str, proposed_names: List[str]):
+    # filter out names which already had recommend reason
+    names_reasons = get_proposal_reasons(session_id)
+    names_need_recommend_reason = []
+    for name in proposed_names:
+        if name in names_reasons:
+            continue
+        names_need_recommend_reason.append(name)
+
+    if not names_need_recommend_reason:
+        logging.debug('no recommend reason is required for session: {}'.format(session_id))
+        return
+
+    job_que_str = create_job_string(session_id, names_need_recommend_reason)
+    pipeline = redis_client.pipeline()
+    pipeline.rpush(PROPOSAL_REASON_JOB_QUEUE_KEY, job_que_str)
+    pipeline.expire(PROPOSAL_REASON_JOB_QUEUE_KEY, time=TWO_WEEKS_IN_SECONDS)
+    pipeline.execute()
+
+    logging.debug('Writing job with session id {} to job queue: {}'.format(
+        session_id, job_que_str))
+
+
+def create_job_string(session_id: str, names: List[str]) -> str:
+    output_dict = {
+        'session_id': session_id,
+        'names': names
+    }
+    return json.dumps(output_dict)
 
 
 def get_name_proposals(session_id) -> List[str]:
