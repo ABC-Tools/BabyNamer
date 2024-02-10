@@ -21,7 +21,7 @@ import app.lib.name_meaning as nm
 
 
 tiktoken_encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
-client = openai.AsyncOpenAI(api_key='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')
+client = openai.AsyncOpenAI(api_key='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', timeout=15)
 
 redis_host = os.environ.get("REDISHOST", "10.49.86.211")
 redis_port = int(os.environ.get("REDISPORT", 6379))

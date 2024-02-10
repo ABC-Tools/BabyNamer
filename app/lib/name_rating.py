@@ -183,14 +183,17 @@ class NameRating:
         name_reason_sentences = {name: '' for name in names}
         for name, pros_cons in name_reasons.items():
             pros = pros_cons['pros']
-            cons = pros_cons['cons']
+            # cons = pros_cons['cons']
 
             if pros:
-                name_reason_sentences[name] = 'This name is considered as {}.'.format(', '.join(pros))
+                name_reason_sentences[name] = 'We recommend this name because it is considered as {}.'\
+                    .format(', '.join(pros))
+                """
                 if cons:
                     name_reason_sentences[name] = \
                         '{original} However, the name is usually considered as not {cons}.'. \
                             format(original=name_reason_sentences[name], cons=', '.join(cons))
+                """
 
         return name_reason_sentences
 

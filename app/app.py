@@ -91,6 +91,8 @@ def get_name_facts():
     if not gender:
         gender = ns.NAME_STATISTICS.guess_gender(name)
 
+    logging.info('[data] user {} request names facts for {}'.format(session_id, name))
+
     origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
     trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
     meaning = nm.NAME_MEANING.get(name, gender)
@@ -163,7 +165,7 @@ def suggest_names():
     start_ts = time.time()
     suggested_names = suggest_names_proc.suggest(session_id, gender)
     logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
-    logging.debug('Final suggested names are: {}'.format(suggested_names))
+    logging.info('[data] Suggested these names for session {}: {}'.format(session_id, suggested_names))
 
     return jsonify(suggested_names)
 
@@ -210,6 +212,7 @@ def update_user_pref(func_call=False):
         if not val:
             continue
         all_prefs[pref_class.get_url_param_name()] = val
+    logging.info('[data] Preferences from session {} is: {}'.format(session_id, json.dumps(all_prefs)))
 
     if not all_prefs or (len(all_prefs) == 1 and all_prefs.get(np.GenderPref.get_url_param_name(), None)):
         resp = {"msg": "success; no-op"}
@@ -265,6 +268,7 @@ def update_user_sentiments(func_call=False):
         else:
             abort(400, "missing user sentiments in request")
 
+    logging.info('[data] sentiments from session {}: {}'.format(session_id, sentiments_str))
     sentiments_inst = np.UserSentiments.create(sentiments_str)
     redis_lib.update_user_sentiments(session_id, sentiments_inst)
 

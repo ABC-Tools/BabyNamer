@@ -7,7 +7,6 @@ from unittest.mock import patch, MagicMock
 import fakeredis
 
 import app.lib.redis as redis_lib
-import app.openai_lib.embedding_client
 import app.procedure.suggest_names as sn
 import app.lib.name_pref as np
 from app.lib.common import Gender
@@ -170,27 +169,6 @@ class TestSuggestNames(unittest.TestCase):
             self.assertTrue('Pascal' not in names)
             self.assertTrue('Claude' not in names)
             self.assertTrue('Francis' not in names)
-
-    def test_name_letter_similarity(self):
-        score = sn.letter_wise_similarity('Kaitlyn', 'Katie')
-        self.assertTrue(score >= 0.8,
-                        'The similarity between Katie and Kaitlin is {}'.format(score))
-
-        score = sn.letter_wise_similarity('Kaitlyn', 'Kaitlin')
-        self.assertTrue(score > 0.8,
-                        'The similarity between Katie and Kaitlin is {}'.format(score))
-
-        score = sn.letter_wise_similarity('Kaitlyn', 'Katelyn')
-        self.assertTrue(score > 0.8,
-                        'The similarity between Katie and Katelyn is {}'.format(score))
-
-        score = sn.letter_wise_similarity('Kaitlyn', 'Caitlin')
-        self.assertTrue(score > 0.7,
-                        'The similarity between Katie and Caitlin is {}'.format(score))
-
-        score = sn.letter_wise_similarity('Kaitlyn', 'Kailyn')
-        self.assertTrue(score > 0.8,
-                        'The similarity between Katie and Kailyn is {}'.format(score))
 
     def test_suggest_name_using_sibling_names(self):
         name_scores = sn.suggest_name_using_sibling_names(Gender.BOY, ['Kaitlyn'])

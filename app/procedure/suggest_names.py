@@ -66,10 +66,10 @@ def suggest(session_id, gender: Gender, count=30):
                                               names_from_sibling_names,
                                               names_from_popularity)
 
-    # write the job to create recommendation reasons; this has to go before update_name_proposal
-    redis_lib.add_job(session_id, final_names)
     # Write a copy in redis for late references
     redis_lib.update_name_proposal(session_id, final_names, name_reasons)
+    # write the job to create recommendation reasons
+    redis_lib.add_job(session_id, final_names)
 
     return final_names
 
@@ -87,25 +87,25 @@ def generate_recommend_reasons(gender: Gender,
     name_reasons = nr.NAME_RATING.create_suggest_reason(gender, list(names_from_options), raw_options)
 
     for name in names_from_sibling_names:
-        sibling_reason = 'This name is similar to the sibling names ({sibling_names})'\
+        sibling_reason = 'we recommend this name because it complements the sibling\'s names ({sibling_names}).'\
                 .format(sibling_names=', '.join(sibling_names))
 
         if name in name_reasons:
-            name_reasons[name] = '{existing_reason} {new_reason}'\
+            name_reasons[name] = '{existing_reason} Also, {new_reason}'\
                 .format(existing_reason=name_reasons[name], new_reason=sibling_reason)
         else:
-            name_reasons[name] = sibling_reason
+            name_reasons[name] = sibling_reason.capitalize()
 
     for name in names_from_popularity:
         _, rank = ns.NAME_STATISTICS.get_frequency_and_rank(name, gender)
-        popularity_reason = 'This name is very popular recently (ranked #{rank} among all names in last 3 years)'\
-            .format(rank=rank)
+        popularity_reason = 'we recommend this name because it is very popular recently ' \
+                            '(ranked #{rank} among all names in last 3 years)'.format(rank=rank)
 
         if name in name_reasons:
-            name_reasons[name] = '{existing_reason} {new_reason}'\
+            name_reasons[name] = '{existing_reason} Further, {new_reason}'\
                 .format(existing_reason=name_reasons[name], new_reason=popularity_reason)
         else:
-            name_reasons[name] = popularity_reason
+            name_reasons[name] = popularity_reason.capitalize()
 
     return name_reasons
 
@@ -221,26 +221,6 @@ def suggest_name_using_sibling_names(gender: Gender,
 
     num = min(count, len(name_similarity_list))
     return {name: distance for name, distance in name_similarity_list[0:num]}
-
-
-def letter_wise_similarity(name1: str, name2: str):
-    a1 = sorted(list(name1.lower()))
-    a2 = sorted(list(name2.lower()))
-
-    i1 = 0
-    i2 = 0
-    count = 0
-    while i1 < len(a1) and i2 < len(a2):
-        if a1[i1] == a2[i2]:
-            count += 1
-            i1 += 1
-            i2 += 1
-        elif a1[i1] < a2[i2]:
-            i1 += 1
-        else:
-            i2 += 1
-
-    return max(1.0 * count / len(a1), 1.0 * count / len(a2))
 
 
 def get_name_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> List[np.PrefInterface]:
