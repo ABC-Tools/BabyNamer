@@ -40,7 +40,9 @@ def suggest(session_id, gender: Gender, count=30):
 
     # Recommend names using popularity
     name_by_popularity = ns.NAME_STATISTICS.get_popular_names(gender, count=count * 10)
-    suggested_names_from_popularity = {name: 1.0 / (rank + 1) for rank, name in enumerate(name_by_popularity)}
+    suggested_names_from_popularity = {name: 1.0 - rank / len(name_by_popularity)
+                                       for rank, name
+                                       in enumerate(name_by_popularity)}
 
     # get the ranked names based on scores
     name_score_list = choose_names(suggest_names_from_option,
@@ -58,6 +60,7 @@ def suggest(session_id, gender: Gender, count=30):
     # generate recommendation reasons
     names_from_options = set(suggest_names_from_option).intersection(final_names)
     names_from_sibling_names = set(suggested_names_from_siblings).intersection(final_names)
+    names_from_embeddings = set(suggested_names_from_text).intersection(final_names)
     names_from_popularity = set(suggested_names_from_popularity).intersection(final_names)
     name_reasons = generate_recommend_reasons(gender,
                                               raw_options,
@@ -71,6 +74,18 @@ def suggest(session_id, gender: Gender, count=30):
     # write the job to create recommendation reasons
     redis_lib.add_job(session_id, final_names)
 
+    # write data for late analysis
+    logging.info('[data] (session: {}) final suggested names: {}'.format(
+        session_id, sorted(final_names)))
+    logging.info('[data] (session: {}) final suggested names from options: {}'.format(
+        session_id, sorted(names_from_options)))
+    logging.info('[data] (session: {}) final suggested names from text embeddings: {}'.format(
+        session_id, sorted(names_from_embeddings)))
+    logging.info('[data] (session: {}) final suggested names from sibling names: {}'.format(
+        session_id, sorted(names_from_sibling_names)))
+    logging.info('[data] (session: {}) final suggested names from names_from_popularity: {}'.format(
+        session_id, sorted(names_from_popularity)))
+
     return final_names
 
 
@@ -80,10 +95,6 @@ def generate_recommend_reasons(gender: Gender,
                                sibling_names: List[str],
                                names_from_sibling_names,
                                names_from_popularity):
-    logging.debug('names_from_options: {}'.format(sorted(names_from_options)))
-    logging.debug('names_from_sibling_names: {}'.format(sorted(names_from_sibling_names)))
-    logging.debug('names_from_popularity: {}'.format(names_from_popularity))
-
     name_reasons = nr.NAME_RATING.create_suggest_reason(gender, list(names_from_options), raw_options)
 
     for name in names_from_sibling_names:

@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Dict
 
 import openai
@@ -10,9 +12,11 @@ client = openai.OpenAI(api_key='sk-SstZvQFjSdmCQ09SnJR3T3BlbkFJpS0iBDHE59srWCpOT
 
 
 def create_single_embedding(msg: str):
+    start_ts = time.time()
     resp = client.with_options(max_retries=2, timeout=1.0)\
         .embeddings\
         .create(input=[msg], model="text-embedding-ada-002")
+    logging.debug('Fetch embedding from OpenAI using {} seconds'.format(time.time() - start_ts))
     return resp.data[0].embedding
 
 

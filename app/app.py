@@ -165,7 +165,6 @@ def suggest_names():
     start_ts = time.time()
     suggested_names = suggest_names_proc.suggest(session_id, gender)
     logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
-    logging.info('[data] Suggested these names for session {}: {}'.format(session_id, suggested_names))
 
     return jsonify(suggested_names)
 
