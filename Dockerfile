@@ -1,5 +1,6 @@
 FROM python:3.8
 LABEL maintainer="tansan78@gmail.com"
+ENV TZ="America/Los_Angeles"
 COPY ./app /app/app/
 COPY ./worker /app/worker/
 COPY ./requirements.txt /app/requirements.txt
