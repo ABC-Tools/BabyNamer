@@ -23,6 +23,7 @@ if context != 'worker' and 'unittest' not in sys.modules.keys():
     # werkzeug_logger.addHandler(file_handler)  # adds handler to the werkzeug WSGI logger
     # root_logger.addHandler(file_handler)
 
+    # Note GCP automatically collect logs from stdout and stderr
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(log_format)
     # werkzeug_logger.addHandler(stdout_handler)
