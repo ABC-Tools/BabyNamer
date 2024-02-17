@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "sanbeacon-1161",
+  "private_key_id": "22de4df17db4876cf08e166280dcf8ca79725a14",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDzrNo1nV+V5Zaa\nZyutzT1p5PTuf4G2OfxvTqefUC4eeQCSdryIGOVWXaytPcd87JaQDo75rCEdjW3s\nKy6Z96igJicXMrQ7VSLBwdftRDlipN2TkX0rSq5vM/3sNd4Z540i42zydEraG1zP\ng+rljIq1UJRAWgtIQxudel5cE8rZHqCDsdTMI2ApZxOcJIA8SWqO1vzpDphkDCAj\ntKo5W5h8xgw9ULDvRxeIOe5ZCsGYmA21oZKxBzIwq0ZlL5lF/TFv6mAmVyvkv7UD\ngwerhKkp22kUFiZVhWVA4E9GemcW5agIzN7nGqXH5ubfBU8PVGjds2wnhFU5qfH8\nPFycJ5j9AgMBAAECggEABH5M/c0bnJ+BsfIyF3/f4IqEy7sVML+L/J92LtVjLFOt\n44WF/3p6DCgpDX7EpXSVaC2kjE0UxT885ix7rQIonV9mvCJGuYtd2zXQXgMyjbOd\nlGGL7dbwNYO/bHIn2NFwxFJuSWBEmxYDFZ6In9gCHMrSGQewCpKWOUau48LHrE4/\nkFHW2w+1CjkxXfZrCKqe5OPpcBh7T4OOvjeVl5FMX1/Z3n/ZQEmtmNubec9UZxab\n3QfrI4wMv5Z4GtazFuMm+jkuzfwd5OwBVYclNB9wP75BpVMlF88//FExMk0sAgy1\ni8HBO5OBInr6sYGB7x/hOCSeGb0Bmx0CvcfW4MPLoQKBgQD7uc9148yEXOMH1MPd\n3wdms8nAzXF7fxPfADhnABP00Md4fod3Dq3tf4wnJSIKN9Evdrd4z/UGH5392x1P\naoie+ZE4gTw5189TJJdSRl5e9dAA4ykHBvSGV3a3vLN1SoEruQ0gbtz9izU2dG26\nN7SwavsaweVFAKog47NGXcX98QKBgQD30AxGx5kI7xnmCiZ8o98Th2s4FNoj/eNV\noNIzhBR+kIPEtdfKG0p+H7mtDxdhZCnpBQY9KBnXaQW49RaldOCHlEnln50/kruU\n6l0zslUhz4daTIJFIPL+JJUDyT+6x+XlLQz1lP/4Ge3rNACpyScdYbO2QopWNUR7\nPegqjrwvzQKBgGZK88tsbse7F2cvRwj6gP9zQCFhWyRcV67fYAw7M+Dglq6YfGQd\nSwCgPEwMAvE0DYXEMHqfx2pdns5yJE8Jc8tmj2Tu35KB6HZZAEUm42KjcYtqxFle\nsi+Fi3DO9f5L8IHcCUGMy7EcyNsAJTbvPDYUw0X0VT7dLkV/QnLt2G+BAoGBAIoX\nfT/T6gt4cc4mydua1axkQfM2a3iy+gO1Ym0ipOkCTutHCcCuBIzT0PwG9NhooJIh\nIqDhv8Sx2WZ/7Oa2gogKskMq9s1+Ttlk4Br2vUniA2LmT5GGEuJcME2zz7edvRZA\nTIBtT1ZJ3LK8f8IdPZa54xMlcUEo3chvbviIIYXhAoGBAKi+WEsgRNJrP8b6T2Lb\nO2h8z/E9P5lFZuN72lzooygQfrboRt82hQnO6ldcQdxixhHYSuiqbonhRLMiyXGG\n8TdhuGBB77d76H5+fgZpDORDZQB7PpFIxz316wYWRFHhrNvr4IemdjDo9kcyIfy/\nQ2t2R/J+88Y4ABTnYAtT20YV\n-----END PRIVATE KEY-----\n",
+  "client_email": "sanbeacon-logger-writer@sanbeacon-1161.iam.gserviceaccount.com",
+  "client_id": "117009441070243593312",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sanbeacon-logger-writer%40sanbeacon-1161.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
