@@ -47,6 +47,16 @@ def index():
     # return 'success'
 
 
+@app.route("/babyname/privacy_notice")
+def privacy_notice():
+    return flask.render_template('privacy.html')
+
+
+@app.route("/babyname/tos")
+def term_of_service():
+    return flask.render_template('tos.html')
+
+
 @app.route("/babyname/name_facts")
 def get_name_facts():
     """
