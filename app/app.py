@@ -28,8 +28,6 @@ app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 sock = Sock(app)
 
-SCHEMA_HOST = "http://localhost"
-
 
 @app.errorhandler(Exception)
 def handle_error(e):
@@ -168,7 +166,7 @@ def suggest_names():
 
     # if user preference is not updated and there is previous proposals, use the previous proposals
     if 'no-op' in pref_resp_msg.get('msg', ''):
-        last_proposals = redis_lib.get_name_proposals(session_id)
+        last_proposals = redis_lib.get_displayed_names(session_id)
         if last_proposals:
             return jsonify(last_proposals)
 
@@ -176,7 +174,38 @@ def suggest_names():
     suggested_names = suggest_names_proc.suggest(session_id, gender)
     logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
 
-    return jsonify(suggested_names)
+    resp_dict = {
+        'suggested_names': suggested_names,
+        'page_no': 0
+    }
+    return jsonify(resp_dict)
+
+
+@app.route("/babyname/refresh")
+def suggest_more():
+    session_id = request.args.get('session_id', default="", type=str)
+    if not session_id or not sid.verify_session_id(session_id):
+        abort(400, "missing or invalid session id: {}".format(session_id))
+
+    gender = request.args.get(np.GenderPref.get_url_param_name(), default="", type=str)
+    gender = canonicalize_gender(gender)
+    if not gender:
+        abort(400, "missing the required parameter of gender")
+
+    last_suggest_no = request.args.get('last_suggest_no', default=0, type=int)
+
+    # Update user sentiments
+    update_user_sentiments(func_call=True)
+
+    start_ts = time.time()
+    suggested_names = suggest_names_proc.suggest(session_id, gender)
+    logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
+
+    resp_dict = {
+        'suggested_names': suggested_names,
+        'page_no': 0
+    }
+    return jsonify(resp_dict)
 
 
 @app.route("/babyname/update_user_pref")
@@ -231,7 +260,7 @@ def update_user_pref(func_call=False):
     redis_lib.update_user_pref(session_id, parsed_prefs)
 
     resp = {"msg": "success"}
-    return json.dumps({"msg": "success"}) if not func_call else resp
+    return jsonify({"msg": "success"}) if not func_call else resp
 
 
 @app.route("/babyname/get_user_pref")
@@ -252,7 +281,7 @@ def get_user_pref():
 
     prefs = redis_lib.get_user_pref(session_id)
     native_prefs = np.class_dict_to_native_dict(prefs)
-    return json.dumps(native_prefs)
+    return jsonify(native_prefs)
 
 
 @app.route("/babyname/update_user_sentiments")
@@ -282,7 +311,7 @@ def update_user_sentiments(func_call=False):
     redis_lib.update_user_sentiments(session_id, sentiments_inst)
 
     resp = {"msg": "success"}
-    return json.dumps(resp) if not func_call else resp
+    return jsonify(resp) if not func_call else resp
 
 
 @app.route("/babyname/get_name_sentiments")
@@ -323,7 +352,7 @@ def get_name_sentiments():
         return {}
 
     name_sentiments_by_sentiments = np.name_sentiments_by_sentiments(name_sentiments)
-    return json.dumps(name_sentiments_by_sentiments)
+    return jsonify(name_sentiments_by_sentiments)
 
 
 if os.environ.get("ENV") == "DEV":

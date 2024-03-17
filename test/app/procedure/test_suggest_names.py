@@ -8,6 +8,7 @@ import fakeredis
 
 import app.lib.redis as redis_lib
 import app.procedure.suggest_names as sn
+import app.procedure.name_proposer as n_proposer
 import app.lib.name_pref as np
 from app.lib.common import Gender
 from test.test_lib import get_test_root_dir
@@ -20,12 +21,12 @@ class TestSuggestNames(unittest.TestCase):
 
     def test_suggest_names_no_pref(self):
         names = sn.suggest('12345', Gender.BOY)
-        self.assertTrue(names[0] == 'Liam')
-        self.assertTrue(names[1] == 'Noah')
+        self.assertTrue(names[0] == 'Liam', names)
+        self.assertTrue(names[1] == 'Noah', names)
 
-        redis_names = redis_lib.get_name_proposals('12345')
-        self.assertTrue(redis_names[0] == 'Liam')
-        self.assertTrue(redis_names[1] == 'Noah')
+        redis_names = redis_lib.get_displayed_names('12345')
+        self.assertTrue('Liam' in redis_names, redis_names)
+        self.assertTrue('Noah' in redis_names, redis_names)
 
         reason = redis_lib.get_proposal_reason_for_name('12345', 'Liam')
         self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
@@ -44,7 +45,7 @@ class TestSuggestNames(unittest.TestCase):
 
         # suggestion from similar names
         reason = redis_lib.get_proposal_reason_for_name('112233', 'Kaden')
-        self.assertTrue('similar to the sibling names' in reason, 'wrong recommendation reason: {}'.format(reason))
+        self.assertTrue('complements the sibling\'s names' in reason, 'wrong recommendation reason: {}'.format(reason))
 
     def test_suggest_names_options(self):
         option = {'style_option': 'Classic', 'texture_option': 'Rough'}
@@ -89,10 +90,11 @@ class TestSuggestNames(unittest.TestCase):
             eb = json.load(fp)
 
         with patch('app.openai_lib.embedding_client.client', spec=True) as mock_client:
-            mock_client.embeddings = MagicMock()
+            with_options_mock = MagicMock()
+            mock_client.with_options.return_value = with_options_mock
 
             resp_mock = MagicMock()
-            mock_client.embeddings.create.return_value = resp_mock
+            with_options_mock.embeddings.create.return_value = resp_mock
 
             resp_mock.data = [MagicMock()]
             resp_mock.data[0].embedding = eb
@@ -112,7 +114,7 @@ class TestSuggestNames(unittest.TestCase):
             redis_lib.update_user_sentiments('67890', sentiments)
 
             names = sn.suggest('67890', Gender.BOY)
-            args, kwargs = mock_client.embeddings.create.call_args
+            args, kwargs = with_options_mock.embeddings.create.call_args
             self.assertTrue('I like France' in kwargs['input'][0],
                             'could not locate the info provide by user: "{}" in prompt: {}'.
                             format('I like France', kwargs['input'][0]))
@@ -136,10 +138,11 @@ class TestSuggestNames(unittest.TestCase):
             eb = json.load(fp)
 
         with patch('app.openai_lib.embedding_client.client', spec=True) as mock_client:
-            mock_client.embeddings = MagicMock()
+            with_options_mock = MagicMock()
+            mock_client.with_options.return_value = with_options_mock
 
             resp_mock = MagicMock()
-            mock_client.embeddings.create.return_value = resp_mock
+            with_options_mock.embeddings.create.return_value = resp_mock
 
             resp_mock.data = [MagicMock()]
             resp_mock.data[0].embedding = eb
@@ -171,7 +174,7 @@ class TestSuggestNames(unittest.TestCase):
             self.assertTrue('Francis' not in names)
 
     def test_suggest_name_using_sibling_names(self):
-        name_scores = sn.suggest_name_using_sibling_names(Gender.BOY, ['Kaitlyn'])
+        name_scores = n_proposer.suggest_name_using_sibling_names(Gender.BOY, ['Kaitlyn'])
         self.assertTrue(all(x > 0.7 for x in name_scores.values()),
                         'The  similarity score is less than 0.6: {}'.format(name_scores))
 

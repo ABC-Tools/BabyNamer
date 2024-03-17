@@ -761,6 +761,36 @@ def name_sentiments_by_sentiments(name_sentiments: UserSentiments) -> Dict[str, 
     return result
 
 
+def get_option_pref(user_prefs_dict: Dict[str, PrefInterface]) -> Dict[str, PrefInterface]:
+    option_pref_url_params = [x.get_url_param_name() for x in OPTION_PREFS]
+
+    result = {}
+    for url_param, pref_instance in user_prefs_dict.items():
+        if url_param in option_pref_url_params:
+            result[url_param] = pref_instance
+
+    return result
+
+
+def get_sibling_name_pref(user_prefs_dict: Dict[str, PrefInterface]):
+    for pref_inst in user_prefs_dict.values():
+        if isinstance(pref_inst, SiblingNames):
+            return pref_inst
+
+    return None
+
+
+def get_name_pref(user_prefs_dict: Dict[str, PrefInterface]) -> List[PrefInterface]:
+    name_pref_url_params = [x.get_url_param_name() for x in NAME_PREFS]
+
+    result = []
+    for present_pref_key, pref_inst in user_prefs_dict.items():
+        if present_pref_key in name_pref_url_params:
+            result.append(pref_inst)
+
+    return result
+
+
 ALL_PREFERENCES = [GenderPref, FamilyName, MotherName, FatherName, SiblingNames,
                    Origin, NamesToAvoid, OtherPref,
                    StyleChoice, MaturityChoice, FormalityChoice, ClassChoice,

@@ -13,7 +13,7 @@ class TestRedis(unittest.TestCase):
         redis_lib.redis_client = fakeredis.FakeRedis(charset="utf-8", decode_responses=True)
 
     def test_add_job(self):
-        redis_lib.add_job('12345', ['Liam', 'Kaysen', 'Georgios', 'Jaydon', 'Jorge'])
+        redis_lib.add_recommendation_job('12345', ['Liam', 'Kaysen', 'Georgios', 'Jaydon', 'Jorge'])
         result = json.loads(redis_lib.redis_client.lpop(redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY))
         self.assertTrue(result['session_id'] == '12345')
         self.assertTrue(result['names'] == ['Liam', 'Kaysen', 'Georgios', 'Jaydon', 'Jorge'])
@@ -24,7 +24,7 @@ class TestRedis(unittest.TestCase):
                                                    'Liam': "A popular name",
                                                    'Jorge': 'A Cute name'
                                                })
-        redis_lib.add_job('123456', ['Liam', 'Kaysen', 'Georgios', 'Jaydon', 'Jorge'])
+        redis_lib.add_recommendation_job('123456', ['Liam', 'Kaysen', 'Georgios', 'Jaydon', 'Jorge'])
         result = json.loads(redis_lib.redis_client.lpop(redis_lib.PROPOSAL_REASON_JOB_QUEUE_KEY))
         self.assertTrue(result['session_id'] == '123456')
         self.assertTrue(result['names'] == ['Kaysen', 'Georgios', 'Jaydon'])

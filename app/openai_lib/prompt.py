@@ -81,28 +81,9 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
     # create the paragraphs for user preferences
     formatted_prefs = []
     for pref in user_prefs_dict.values():
-        if isinstance(pref, np.GenderPref) or isinstance(pref, np.MotherName) \
-                or isinstance(pref, np.FatherName):
-            pref_str = '{meaning}: {value}.'.format(meaning=pref.__class__.get_pref_meaning(),
-                                                    value=pref.get_val_str())
-            formatted_prefs.append(pref_str)
-        elif isinstance(pref, np.FamilyName):
-            pref_str = '{meaning}: {value}. Please suggest a few names which complement the {meaning}.' \
-                .format(meaning=pref.__class__.get_pref_meaning(), value=pref.get_val_str())
-            formatted_prefs.append(pref_str)
-        elif isinstance(pref, np.Origin):
+        if isinstance(pref, np.Origin):
             pref_str = '{meaning}: {value}. Please suggest a few names which has the connection with {value}.' \
                 .format(meaning=pref.__class__.get_pref_meaning(), value=pref.get_val_str())
-            formatted_prefs.append(pref_str)
-        elif isinstance(pref, np.SiblingNames):
-            names_str = ', '.join(pref.get_val())
-            pref_str = "{meaning}: {value}. Please suggest a few names which complement or are similar" \
-                       " in style or theme to these {meaning}." \
-                .format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
-            formatted_prefs.append(pref_str)
-        elif isinstance(pref, np.NamesToAvoid):
-            names_str = ', '.join(pref.get_val())
-            pref_str = '{meaning}: {value}.'.format(meaning=pref.__class__.get_pref_meaning(), value=names_str)
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.OtherPref):
             pref_str = 'Other info user provided: {value}.'.format(value=pref.get_val())
@@ -117,8 +98,6 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
             pref_str = '{meaning}: user prefers {choice} names.'.format(
                 meaning=pref.__class__.get_pref_meaning(), choice=choice)
             formatted_prefs.append(pref_str)
-        else:
-            raise ValueError('Unexpected user preference: {}'.format(pref.__class__.get_url_param_name()))
 
     return '\n'.join(formatted_prefs)
 

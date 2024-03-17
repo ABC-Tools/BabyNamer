@@ -139,8 +139,47 @@ def get_sentiment_for_name(session_id: str, name) -> Dict[str, str]:
 
 
 """
-Name proposal
-- name proposals: a user-specific list which stores the name proposals
+Track names displayed to a specific user, so we don't show the same names again
+Use a user-specific sorted set which stores the name displayed before
+"""
+MAX_NUM_OF_TRACKED_NAMES = 100
+
+
+def get_displayed_names_key(session_id):
+    return 'proposal-{}'.format(session_id)
+
+
+def append_displayed_names(session_id: str, names: List[str]):
+    if not names:
+        return
+
+    pipeline = redis_client.pipeline()
+
+    # trim the sorted set if needed
+    proposal_key = get_displayed_names_key(session_id)
+    displayed_names_count = redis_client.zcard(proposal_key)
+    trim_count = displayed_names_count + len(names) - MAX_NUM_OF_TRACKED_NAMES
+    if trim_count > 0:
+        pipeline.zremrangebyrank(proposal_key, 0, trim_count)
+
+    # put displayed names in a sorted set
+    pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
+    cur_ts = int(time.time())
+    pipeline.zadd(proposal_key, {x: cur_ts for x in names})
+
+    pipeline.execute()
+
+
+def get_displayed_names(session_id, max_count=100) -> List[str]:
+    """
+    :return: a list like ["Asher", "Caleb", "Ethan":]
+    """
+    proposal_key = get_displayed_names_key(session_id)
+    return redis_client.zrevrange(proposal_key, 0, max_count)
+
+
+"""
+Write a job for background job to generate recommend reasons
 - name proposal reason job: a shared list for the background job to fetch 
 - name proposal reason: a user-specific hash with the name as key and with the reason as value
 """
@@ -149,44 +188,12 @@ Name proposal
 PROPOSAL_REASON_JOB_QUEUE_KEY = 'reason_job_que'
 
 
-def get_name_proposals_key(session_id):
-    return 'proposal-{}'.format(session_id)
-
-
-def get_last_proposal_time_key(session_id):
-    return 'proposal-ts-{}'.format(session_id)
-
-
-def get_name_proposal_reason_key(session_id):
+def get_recommendation_reason_key(session_id):
     return 'proposal-reason-{}'.format(session_id)
 
 
-def update_name_proposal(session_id: str, proposed_names: List[str], name_reasons: Dict[str, str]):
-    if not proposed_names:
-        return
-
-    pipeline = redis_client.pipeline()
-
-    # set proposed names
-    proposal_key = get_name_proposals_key(session_id)
-    pipeline.delete(proposal_key)
-    pipeline.rpush(proposal_key, *proposed_names)
-    pipeline.expire(proposal_key, time=TWO_WEEKS_IN_SECONDS)
-
-    if name_reasons:
-        proposal_reason_key = get_name_proposal_reason_key(session_id)
-        pipeline.hset(proposal_reason_key, mapping=name_reasons)
-        pipeline.expire(proposal_reason_key, time=TWO_WEEKS_IN_SECONDS)
-
-    # set last updated timestamp
-    last_proposal_time_key = get_last_proposal_time_key(session_id)
-    pipeline.set(last_proposal_time_key, int(time.time()), ex=TWO_WEEKS_IN_SECONDS)
-
-    pipeline.execute()
-
-
-def add_job(session_id: str, proposed_names: List[str]):
-    # filter out names which already had recommend reason
+def add_recommendation_job(session_id: str, proposed_names: List[str]):
+    # filter out names which already had recommendation reason
     names_reasons = get_proposal_reasons(session_id)
     names_need_recommend_reason = []
     for name in proposed_names:
@@ -216,18 +223,10 @@ def create_job_string(session_id: str, names: List[str]) -> str:
     return json.dumps(output_dict)
 
 
-def get_name_proposals(session_id) -> List[str]:
-    """
-    :return: a list like ["Asher", "Caleb", "Ethan":]
-    """
-    proposal_key = get_name_proposals_key(session_id)
-    return redis_client.lrange(proposal_key, 0, -1)
-
-
 def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], clear_job_que=True):
     pipeline = redis_client.pipeline()
 
-    proposal_reason_key = get_name_proposal_reason_key(session_id)
+    proposal_reason_key = get_recommendation_reason_key(session_id)
     pipeline.hset(proposal_reason_key, mapping=proposal_reasons)
     pipeline.expire(proposal_reason_key, time=TWO_WEEKS_IN_SECONDS)
 
@@ -238,16 +237,10 @@ def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], c
 
 
 def get_proposal_reason_for_name(session_id, name) -> str:
-    proposal_key = get_name_proposal_reason_key(session_id)
+    proposal_key = get_recommendation_reason_key(session_id)
     return redis_client.hget(proposal_key, name)
 
 
 def get_proposal_reasons(session_id) -> Dict[str, str]:
-    proposal_key = get_name_proposal_reason_key(session_id)
+    proposal_key = get_recommendation_reason_key(session_id)
     return redis_client.hgetall(proposal_key)
-
-
-def get_last_proposal_time(session_id) -> int:
-    last_proposal_time_key = get_last_proposal_time_key(session_id)
-    last_ts = redis_client.get(last_proposal_time_key)
-    return last_ts if last_ts else 0
