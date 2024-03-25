@@ -9,7 +9,7 @@ import logging
 import os
 
 from flask_sock import Sock
-from flask import request, abort, jsonify
+from flask import request, abort, jsonify, g
 
 import app.lib.redis as redis_lib
 from app.openai_lib.assistant import Assistant
@@ -27,6 +27,20 @@ import app.procedure.suggest_names as suggest_names_proc
 app = flask.Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 sock = Sock(app)
+
+
+@app.before_request
+def logging_before():
+    # Store the start time for the request
+    g.start_time = time.perf_counter()
+
+
+@app.after_request
+def after_request(response):
+    latency = int((time.perf_counter() - g.start_time) * 1000)
+    logging.info('End latency of request ({endpoint}) is {latency}ms.'.format(
+        endpoint=request.path, latency=latency))
+    return response
 
 
 @app.errorhandler(Exception)
@@ -159,19 +173,19 @@ def suggest_names():
         abort(400, "missing the required parameter of gender")
 
     # update user preferences
-    pref_resp_msg = update_user_pref(func_call=True)
+    pref_resp_msg = update_user_pref(func_call=True, delete_before_updating=True)
 
     # Update user sentiments
     update_user_sentiments(func_call=True)
 
     # if user preference is not updated and there is previous proposals, use the previous proposals
     if 'no-op' in pref_resp_msg.get('msg', ''):
-        last_proposals = redis_lib.get_displayed_names(session_id)
+        last_proposals = redis_lib.get_displayed_names(session_id, max_count=20)
         if last_proposals:
             return jsonify(last_proposals)
 
     start_ts = time.time()
-    suggested_names = suggest_names_proc.suggest(session_id, gender)
+    suggested_names = suggest_names_proc.suggest(session_id, gender, filter_displayed_names=False)
     logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
 
     resp_dict = {
@@ -198,7 +212,7 @@ def suggest_more():
     update_user_sentiments(func_call=True)
 
     start_ts = time.time()
-    suggested_names = suggest_names_proc.suggest(session_id, gender)
+    suggested_names = suggest_names_proc.suggest(session_id, gender, filter_displayed_names=True)
     logging.info('Compute recommended name using {} seconds'.format(time.time() - start_ts))
 
     resp_dict = {
@@ -209,7 +223,7 @@ def suggest_more():
 
 
 @app.route("/babyname/update_user_pref")
-def update_user_pref(func_call=False):
+def update_user_pref(func_call=False, delete_before_updating=False):
     """
     URL parameters:
         - session_id: required
@@ -257,7 +271,7 @@ def update_user_pref(func_call=False):
         return json.dumps(resp) if not func_call else resp
 
     parsed_prefs = np.str_dict_to_class_dict(all_prefs)
-    redis_lib.update_user_pref(session_id, parsed_prefs)
+    redis_lib.update_user_pref(session_id, parsed_prefs, delete_before_updating=delete_before_updating)
 
     resp = {"msg": "success"}
     return jsonify({"msg": "success"}) if not func_call else resp

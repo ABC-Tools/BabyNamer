@@ -28,9 +28,6 @@ class TestSuggestNames(unittest.TestCase):
         self.assertTrue('Liam' in redis_names, redis_names)
         self.assertTrue('Noah' in redis_names, redis_names)
 
-        reason = redis_lib.get_proposal_reason_for_name('12345', 'Liam')
-        self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
-
     def test_suggest_names_sibling_name(self):
         sibling_name_pref = np.SiblingNames.create('["Kaitlyn", "Kayden"]')
         redis_lib.update_user_pref('112233', {np.SiblingNames.get_url_param_name(): sibling_name_pref})
@@ -38,10 +35,6 @@ class TestSuggestNames(unittest.TestCase):
         names = sn.suggest('112233', Gender.BOY)
         self.assertTrue('Liam' in names)
         self.assertTrue('Kaden' in names)
-
-        # suggestion from top names
-        reason = redis_lib.get_proposal_reason_for_name('112233', 'Liam')
-        self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
 
         # suggestion from similar names
         reason = redis_lib.get_proposal_reason_for_name('112233', 'Kaden')
@@ -60,15 +53,6 @@ class TestSuggestNames(unittest.TestCase):
         self.assertTrue('Liam' in names)
         self.assertTrue('Ragnar' in names)
 
-        # suggestion from top names
-        reason = redis_lib.get_proposal_reason_for_name('654321', 'Liam')
-        self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
-
-        # suggestion from similar names
-        reason = redis_lib.get_proposal_reason_for_name('654321', 'Ragnar')
-        self.assertTrue('the top 1% Classic name' in reason, 'wrong recommendation reason: {}'.format(reason))
-        self.assertTrue('the top 1% Rough name' in reason, 'wrong recommendation reason: {}'.format(reason))
-
     def test_filter_out_name(self):
         option = {'style_option': 'Classic', 'texture_option': 'Rough'}
         style = np.StyleChoice.create(option['style_option'])
@@ -84,7 +68,33 @@ class TestSuggestNames(unittest.TestCase):
         self.assertTrue('Liam' not in names)
         self.assertTrue('Ragnar' in names)
 
-    def test_suggest_name_from_text(self):
+    @patch('app.openai_lib.chat_completion.check_proposed_names')
+    def test_filter_out_displayed_names(self, check_proposed_names_mock):
+        def no_op_func(filtered_names, user_prefs_dict, user_sentiments, max_count):
+            return filtered_names[:max_count]
+        check_proposed_names_mock.side_effect = no_op_func
+        option = {'style_option': 'Classic', 'texture_option': 'Rough'}
+        style = np.StyleChoice.create(option['style_option'])
+        texture = np.TextureChoice.create(option['texture_option'])
+
+        sibling_name = np.SiblingNames.create('["Liam"]')
+        redis_lib.update_user_pref('654321',
+                                   {np.StyleChoice.get_url_param_name(): style,
+                                    np.TextureChoice.get_url_param_name(): texture,
+                                    np.SiblingNames.get_url_param_name(): sibling_name})
+        redis_lib.append_displayed_names('654321', ['Ragnar', 'William'])
+
+        names = sn.suggest('654321', Gender.BOY, filter_displayed_names=True, count=10)
+        self.assertTrue('Liam' not in names)
+        self.assertTrue('Ragnar' not in names)
+        self.assertTrue('Joab' in names)
+
+    @patch('app.openai_lib.chat_completion.check_proposed_names')
+    def test_suggest_name_from_text(self, check_proposed_names_mock):
+        def no_op_func(filtered_names, user_prefs_dict, user_sentiments, max_count):
+            return filtered_names[:max_count]
+        check_proposed_names_mock.side_effect = no_op_func
+
         filename = os.path.join(get_test_root_dir(), 'app', 'lib', 'data', 'eb_i_like_french_name.json')
         with open(filename, 'r') as fp:
             eb = json.load(fp)
@@ -124,15 +134,16 @@ class TestSuggestNames(unittest.TestCase):
             self.assertTrue('Liam' in names)
             self.assertTrue('Jules' in names)
 
-            # suggestion from top names
-            reason = redis_lib.get_proposal_reason_for_name('67890', 'Liam')
-            self.assertTrue('ranked #1' in reason, 'wrong recommendation reason: {}'.format(reason))
-
             # suggestion from text
             reason = redis_lib.get_proposal_reason_for_name('67890', 'Jules')
             self.assertTrue(not reason)
 
-    def test_filter_out_name_from_sentiments(self):
+    @patch('app.openai_lib.chat_completion.check_proposed_names')
+    def test_filter_out_name_from_sentiments(self, check_proposed_names_mock):
+        def no_op_func(filtered_names, user_prefs_dict, user_sentiments, max_count):
+            return filtered_names[:max_count]
+        check_proposed_names_mock.side_effect = no_op_func
+
         filename = os.path.join(get_test_root_dir(), 'app', 'lib', 'data', 'eb_i_like_french_name.json')
         with open(filename, 'r') as fp:
             eb = json.load(fp)

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Set
 
 from app.lib.common import Gender
 from app.lib import name_pref as np
@@ -11,14 +11,44 @@ def filter_names(session_id: str,
                  gender: Gender,
                  user_prefs_dict: Dict[str, np.PrefInterface],
                  user_sentiments: np.UserSentiments,
-                 name_score_list: List[Tuple[str, float]]) -> List[Tuple[str, float]]:
-    name_prefs = np.get_name_pref(user_prefs_dict)
-    displayed_names = redis_lib.get_displayed_names(session_id)
-
+                 name_list: List[str],
+                 filter_displayed_names: bool = False) -> List[str]:
     # Filter names based on preference
+    name_prefs = np.get_name_pref(user_prefs_dict)
+    names_to_avoid = get_filter_names_from_pref(gender, name_prefs)
+    filtered_names = filter_names_internal(name_list, names_to_avoid, 'user preferences')
+
+    # filter out names which user has reviewed (favored/liked/disliked)
+    names_from_sentiments = set(user_sentiments.get_val().keys())
+    filtered_names = filter_names_internal(filtered_names, names_from_sentiments, 'user sentiments')
+
+    # filter out names which is similar to those names which user disliked
+    similar_disliked_names = get_filter_names_from_dislikes(gender, user_sentiments)
+    filtered_names = filter_names_internal(filtered_names, similar_disliked_names, 'disliked names')
+
+    # filter names displayed before
+    if filter_displayed_names:
+        displayed_names = set(redis_lib.get_displayed_names(session_id))
+        filtered_names = filter_names_internal(filtered_names, displayed_names, 'previously displayed names')
+
+    return filtered_names
+
+
+def filter_names_internal(names: List[str],
+                          names_to_avoid: Set[str],
+                          verbose_reason: str) -> List[str]:
+    filtered_names = [name for name in names if name not in names_to_avoid]
+    filtered_out_names = [name for name in names if name in names_to_avoid]
+    if filtered_out_names:
+        logging.debug('Names {} has been removed because of {}'.format(filtered_out_names, verbose_reason))
+
+    return filtered_names
+
+
+def get_filter_names_from_pref(gender: Gender, name_prefs: List[np.PrefInterface]) -> Set[str]:
     names_to_avoid = set()
     for pref in name_prefs:
-        if isinstance(pref, np.MotherName) or  isinstance(pref, np.FatherName):
+        if isinstance(pref, np.MotherName) or isinstance(pref, np.FatherName):
             names_to_avoid.add(pref.get_val())
         elif isinstance(pref, np.SiblingNames):
             names_to_avoid.update(pref.get_val())
@@ -28,20 +58,10 @@ def filter_names(session_id: str,
                 similar_names = sn.SIMILAR_NAMES.get(name, gender)
                 names_to_avoid.update(similar_names)
 
-    filtered_name_score_list = [(name, score) for name, score in name_score_list if name not in names_to_avoid]
-    filtered_out_names = [name for name, score in name_score_list if name in names_to_avoid]
-    if filtered_out_names:
-        logging.debug('Names {} has been removed because of user preferences'.format(filtered_out_names))
+    return names_to_avoid
 
-    # filter out names which user has reviewed (favored/liked/disliked)
-    names_from_sentiments = set(user_sentiments.get_val().keys())
-    filtered_out_names = [name for name, score in filtered_name_score_list if name in names_from_sentiments]
-    filtered_name_score_list = [(name, score) for name, score in filtered_name_score_list
-                                if name not in names_from_sentiments]
-    if filtered_out_names:
-        logging.debug('Names {} has been removed because of user sentiments'.format(filtered_out_names))
 
-    # filter out names which is similar to those names which user disliked
+def get_filter_names_from_dislikes(gender: Gender, user_sentiments: np.UserSentiments) -> Set[str]:
     similar_disliked_names = set()
     for name, sentiment_dict in user_sentiments.get_val().items():
         if sentiment_dict['sentiment'] != np.Sentiment.DISLIKED:
@@ -49,22 +69,4 @@ def filter_names(session_id: str,
 
         similar_names = sn.SIMILAR_NAMES.get(name, gender)
         similar_disliked_names.update(similar_names)
-    filtered_out_names = [name for name, score in filtered_name_score_list if name in similar_disliked_names]
-    filtered_name_score_list = [(name, score) for name, score in filtered_name_score_list
-                                if name not in similar_disliked_names]
-    if filtered_out_names:
-        logging.debug('Names {} has been removed because they are similar as names user disliked'.format(
-            filtered_out_names))
-
-    # filter names displayed before
-    displayed_names = set(displayed_names)
-    filtered_out_names = [name for name, score in filtered_name_score_list if name in displayed_names]
-    filtered_name_score_list = [(name, score) for name, score in filtered_name_score_list
-                                if name not in similar_disliked_names]
-    if filtered_out_names:
-        logging.debug('Names {} has been removed because they have been displayed to user before'.format(
-            filtered_out_names))
-
-    return filtered_name_score_list
-
-
+    return similar_disliked_names

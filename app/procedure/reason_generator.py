@@ -15,8 +15,9 @@ def generate(session_id: str,
              final_names: List[str]):
     names_from_options = set(proposed_names.get_suggest_names_from_option()).intersection(final_names)
     names_from_sibling_names = set(proposed_names.get_suggested_names_from_siblings()).intersection(final_names)
-    names_from_embeddings = set(proposed_names.get_suggested_names_from_text()).intersection(final_names)
-    names_from_popularity = set(proposed_names.get_suggested_names_from_popularity()).intersection(final_names)
+    # names_from_embeddings = set(proposed_names.get_suggested_names_from_text()).intersection(final_names)
+    # names_from_popularity = set(proposed_names.get_suggested_names_from_popularity()).intersection(final_names)
+    names_from_popularity = []
 
     option_prefs = np.get_option_pref(user_prefs_dict)
     raw_options = {url_param: pref_inst.get_val() for url_param, pref_inst in option_prefs.items()}

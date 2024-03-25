@@ -26,32 +26,47 @@ class InvalidResponse(json.decoder.JSONDecodeError):
 
 def check_proposed_names(proposed_names: List[str],
                          user_prefs: Dict[str, np.PrefInterface],
-                         user_sentiments: np.UserSentiments):
-    system_msg = "You are a helpful assistant to decide whether the proposed baby names are good based on "\
-        "the user's input"
+                         user_sentiments: np.UserSentiments,
+                         max_count: int):
+    system_msg = "You are a helpful assistant to identify good names which meet the requirements from user's input"
 
     sentiment_summary = create_summary_of_user_sentiments(user_sentiments)
     other_pref = user_prefs.get(np.OtherPref.get_url_param_name()) .get_val() \
         if np.OtherPref.get_url_param_name() in user_prefs else ""
-    user_prompt = """
-Please decide whether the proposed names are good for newborns, based on user's input.
+    if not sentiment_summary.strip() and not other_pref.strip():
+        return proposed_names[:max_count]
 
-please return a list of good names from the proposed names based on user's input, in a json format, like
+    user_prompt = """
+Please identify good names which meet the requirements from user's input.
+
+please review the below proposed names, identify the top {max_count} names which meet the requirements 
+from user's input, and return such {max_count} good names in a json format, like
 {{
     "good names": ["name_1", "name_2", ...]
 }}
+
+The proposed names are ordered by priority. If possible, please return names from the beginning of
+the proposed names which meet user's requirements.
+
+If there are less {max_count} names from the proposed names which meet the requirements from user's input,
+please suggest other names which meet the requirements from user's input, so {max_count} names are returned.
 
 Proposed name: {proposed_names}
 User's input:
 {other_pref}
 {sentiment_summary}
-    """.format(proposed_names=proposed_names, sentiment_summary=sentiment_summary, other_pref=other_pref)
+    """.format(proposed_names=proposed_names[:2*max_count],
+               sentiment_summary=sentiment_summary,
+               other_pref=other_pref,
+               max_count=max_count)
 
     logging.debug(f"user_prompt: {user_prompt}")
 
     start_ts = int(time.time())
     response = client.with_options(max_retries=5, timeout=60).chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        # GPT 3.5 seems not able to reason well
+        # model="gpt-3.5-turbo-1106",
+        model="gpt-4-1106-preview",
         response_format={"type": "json_object"},
         messages=[
             {
@@ -71,6 +86,7 @@ User's input:
     logging.info('Total used tokens: {} and elapse time: {} seconds'.format(
         response.usage.total_tokens, int(time.time()) - start_ts))
 
+    logging.info('ChatGPT raw output: {}'.format(response.choices[0].message.content))
     try:
         parsed_rsp = json.loads(response.choices[0].message.content)
         final_names = parsed_rsp.get("good names", [])
@@ -78,11 +94,7 @@ User's input:
         logging.exception(e, exc_info=True)
         raise e
 
-    if not final_names:
-        logging.warning(f"ChatGPT removed all proposed names: {proposed_names}")
-        return proposed_names
-    else:
-        return final_names
+    return final_names
 
 
 def create_summary_of_user_sentiments(user_sentiments: np.UserSentiments) -> str:

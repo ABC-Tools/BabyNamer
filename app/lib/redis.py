@@ -34,7 +34,7 @@ def get_last_pref_update_time(session_id) -> int:
     return last_ts if last_ts else 0
 
 
-def update_user_pref(session_id, user_prefs: Dict[str, np.PrefInterface]):
+def update_user_pref(session_id, user_prefs: Dict[str, np.PrefInterface], delete_before_updating=False):
     """
     Update the user preferences in Redis
     """
@@ -46,6 +46,8 @@ def update_user_pref(session_id, user_prefs: Dict[str, np.PrefInterface]):
     # add general preferences into redis pipeline
     pipeline = redis_client.pipeline()
     pref_key = get_pref_key(session_id)
+    if delete_before_updating:
+        pipeline.delete(pref_key)
     pipeline.hset(pref_key, mapping=pref_dict)
     # Add expiration the last update time
     pipeline.zadd(LAST_PREF_UPDATE_TS_KEY, mapping={session_id: int(time.time())})
@@ -224,6 +226,9 @@ def create_job_string(session_id: str, names: List[str]) -> str:
 
 
 def update_name_proposal_reasons(session_id, proposal_reasons: Dict[str, str], clear_job_que=True):
+    if not proposal_reasons:
+        return
+
     pipeline = redis_client.pipeline()
 
     proposal_reason_key = get_recommendation_reason_key(session_id)
