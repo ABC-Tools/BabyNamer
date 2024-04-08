@@ -19,7 +19,7 @@ class OriginShortMeaning:
         if not gender:
             gender = ns.NAME_STATISTICS.guess_gender(name)
 
-        tmp_dict = self.__osm__.get((name, gender), {})
+        tmp_dict = self.__osm__[gender].get(name, {})
         origin = tmp_dict.get('origin', '')
         short_meaning = tmp_dict.get('short_meaning', '')
         return origin, short_meaning
@@ -45,7 +45,11 @@ class OriginShortMeaning:
         """
         returns a dict with key of (name, gender), and with the origin and the short meaning of the name
         """
-        result = {}
+        result = {
+            Gender.BOY: {},
+            Gender.GIRL: {}
+        }
+
         for name_dict in name_list:
             name = canonicalize_name(name_dict['name'])
             origin = name_dict['origin']
@@ -53,11 +57,11 @@ class OriginShortMeaning:
 
             raw_gender = name_dict['gender']
             if raw_gender.lower() in ['neutral']:
-                result[(name, Gender.BOY)] = {'origin': origin, 'short_meaning': short_meaning}
-                result[(name, Gender.GIRL)] = {'origin': origin, 'short_meaning': short_meaning}
+                result[Gender.BOY][name] = {'origin': origin, 'short_meaning': short_meaning}
+                result[Gender.GIRL][name] = {'origin': origin, 'short_meaning': short_meaning}
             else:
                 gender = canonicalize_gender(raw_gender)
-                result[(name, gender)] = {'origin': origin, 'short_meaning': short_meaning}
+                result[gender][name] = {'origin': origin, 'short_meaning': short_meaning}
 
         return result
 

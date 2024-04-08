@@ -4,20 +4,14 @@ import os
 import json
 import time
 
-from typing import Dict, List
+from typing import Dict, List, Set
 from app.lib import name_pref as np
-from .prompt import create_user_prompt
+from app.lib.name_sentiments import UserSentiments
+import app.openai_lib.prompt as prompt
+from app.lib.common import Gender
 
 API_KEY = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(api_key='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')
-
-CONTENT_FORMAT_1 = """"
-Please help the user to name the baby, based on the information provided by user.
-"""
-
-CONTENT_FORMAT_2 = """
-You are a helpful assistant to suggest names for newborns based on specific information provided by the user.
-"""
 
 
 class InvalidResponse(json.decoder.JSONDecodeError):
@@ -26,11 +20,11 @@ class InvalidResponse(json.decoder.JSONDecodeError):
 
 def check_proposed_names(proposed_names: List[str],
                          user_prefs: Dict[str, np.PrefInterface],
-                         user_sentiments: np.UserSentiments,
+                         user_sentiments: UserSentiments,
                          max_count: int):
     system_msg = "You are a helpful assistant to identify good names which meet the requirements from user's input"
 
-    sentiment_summary = create_summary_of_user_sentiments(user_sentiments)
+    sentiment_summary = prompt.create_summary_of_user_sentiments(user_sentiments)
     other_pref = user_prefs.get(np.OtherPref.get_url_param_name()) .get_val() \
         if np.OtherPref.get_url_param_name() in user_prefs else ""
     if not sentiment_summary.strip() and not other_pref.strip():
@@ -63,7 +57,7 @@ User's input:
     logging.debug(f"user_prompt: {user_prompt}")
 
     start_ts = int(time.time())
-    response = client.with_options(max_retries=5, timeout=60).chat.completions.create(
+    response = client.with_options(max_retries=2, timeout=15).chat.completions.create(
         # GPT 3.5 seems not able to reason well
         # model="gpt-3.5-turbo-1106",
         model="gpt-4-1106-preview",
@@ -97,58 +91,49 @@ User's input:
     return final_names
 
 
-def create_summary_of_user_sentiments(user_sentiments: np.UserSentiments) -> str:
-    if not user_sentiments:
-        return ''
+def propose_names(gender: Gender,
+                  user_prefs: Dict[str, np.PrefInterface],
+                  user_sentiments: UserSentiments,
+                  names_to_avoid: Set[str],
+                  max_count: int):
+    system_msg = "You are a helpful assistant to propose names for a newborn based on user's input"
 
-    # create the paragraphs for user sentiments
-    formatted_prefs = []
+    sentiment_summary = prompt.create_summary_of_user_sentiments(user_sentiments)
+    pref_summary = prompt.create_text_from_user_pref(user_prefs)
 
-    liked_template = 'User {sentiment} the name of {name}{reason_clause}.'
-    disliked_template = 'User {sentiment} the name of {name}{reason_clause}.'
-    saved_template = 'User {sentiment} the name of {name} as a favorite{reason_clause}.'
+    user_prompt = """
+Please propose {max_count} names for a {gender} newborn based on user's input.
 
-    for name, sentiment_dict in user_sentiments.get_val().items():
-        if sentiment_dict['sentiment'] == np.Sentiment.LIKED:
-            template = liked_template
-        elif sentiment_dict['sentiment'] == np.Sentiment.DISLIKED:
-            template = disliked_template
-        elif sentiment_dict['sentiment'] == np.Sentiment.SAVED:
-            template = saved_template
-        else:
-            raise ValueError('Unexpected sentiment: {}'.format(sentiment_dict['sentiment']))
+Return the {max_count} good names in a json format, like
+{{
+    "names": ["name_1", "name_2", ...]
+}}.
 
-        if 'reason' in sentiment_dict and sentiment_dict['reason']:
-            reason_clause = ', because {}'.format(sentiment_dict['reason'])
-        else:
-            reason_clause = ''
+User's input:
+{pref_summary}
+{sentiment_summary}
 
-        pref_str = template.format(
-            meaning=user_sentiments.__class__.get_pref_meaning(),
-            sentiment=str(sentiment_dict['sentiment']),
-            name=name,
-            reason_clause=reason_clause)
+Please do not suggest the following names:
+{names_to_avoid}
+    """.format(gender=gender,
+               sentiment_summary=sentiment_summary,
+               pref_summary=pref_summary,
+               max_count=max_count,
+               names_to_avoid=names_to_avoid)
 
-        formatted_prefs.append(pref_str)
-
-    return '\n'.join(formatted_prefs)
-
-
-def send_and_receive(user_prefs: Dict[str, np.PrefInterface], user_sentiments: np.UserSentiments) -> Dict[str, str]:
-    user_prompt = create_user_prompt(user_prefs, user_sentiments)
-
-    logging.info("system prompt: {}".format(CONTENT_FORMAT_2))
-    logging.info("User prompt: {}".format(user_prompt))
+    logging.debug(f"user_prompt: {user_prompt}")
 
     start_ts = int(time.time())
-    response = client.with_options(max_retries=5, timeout=60).chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+    response = client.with_options(max_retries=2, timeout=15).chat.completions.create(
+        # GPT 3.5 seems not able to reason well
+        # model="gpt-3.5-turbo-1106",
+        model="gpt-4-1106-preview",
         response_format={"type": "json_object"},
         messages=[
             {
                 "role": "system",
-                "content": CONTENT_FORMAT_2
-             },
+                "content": system_msg
+            },
             {
                 "role": "user",
                 "content": user_prompt
@@ -162,14 +147,12 @@ def send_and_receive(user_prefs: Dict[str, np.PrefInterface], user_sentiments: n
     logging.info('Total used tokens: {} and elapse time: {} seconds'.format(
         response.usage.total_tokens, int(time.time()) - start_ts))
 
+    logging.info('ChatGPT raw output: {}'.format(response.choices[0].message.content))
     try:
         parsed_rsp = json.loads(response.choices[0].message.content)
+        final_names = parsed_rsp.get("names", [])
     except json.decoder.JSONDecodeError as e:
         logging.exception(e, exc_info=True)
         raise e
 
-    # debug
-    # import pprint
-    # pprint.PrettyPrinter().pprint(parsed_rsp)
-
-    return parsed_rsp
+    return final_names

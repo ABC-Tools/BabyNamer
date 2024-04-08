@@ -4,7 +4,7 @@ import os
 
 context = os.environ.get('CONTEXT', 'flask')
 
-if context != 'worker' and 'unittest' not in sys.modules.keys():
+if context != 'worker' and context != 'tools' and 'unittest' not in sys.modules.keys():
     log_format = logging.Formatter(
         '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
     )

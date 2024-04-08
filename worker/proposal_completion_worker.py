@@ -160,7 +160,7 @@ def create_user_description(session_id):
     gender = gender_pref.get_val()
 
     user_pref_str = prompt.create_text_from_user_pref(user_prefs_dict)
-    user_sentiments_str = prompt.create_text_from_user_sentiments(user_sentiments)
+    user_sentiments_str = prompt.create_summary_of_user_sentiments(user_sentiments)
     user_context = '''
 The user provided preference:
 {user_pref_str}
