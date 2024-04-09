@@ -1,62 +1,29 @@
+import logging
 from typing import Dict
 
 from app.lib.common import Gender, canonicalize_gender
 from app.lib import name_pref as np
+from app.lib.name_sentiments import UserSentiments, Sentiment
 import app.lib.name_rating as nr
 
 
-def create_user_prompt(user_prefs_dict: Dict[str, np.PrefInterface],
-                       user_sentiments: np.UserSentiments) -> str:
-    user_prefs = user_prefs_dict.values()
-    # Create the start of prompt
-    factors = [pref.__class__.get_pref_meaning() for pref in user_prefs]
-    if user_sentiments:
-        factors.append(np.UserSentiments.get_pref_meaning())
-    if len(factors) == 0:
-        prompt_beginning = 'Suggest English names for a newborn.'
-    else:
-        prompt_beginning = "Suggest good English names for a newborn considering {}.".format(', '.join(factors))
-
-    # create the paragraphs for user preferences
-    user_pref_str = create_text_from_user_pref(user_prefs_dict)
-    user_sentiments_str = create_text_from_user_sentiments(user_sentiments)
-
-    return '''
-{prompt_beginning}
-
-{user_pref_str}
-{user_sentiments_str}
-
-Please suggest names without asking questions. Please provide 10 name proposals in a JSON format.
-
-Example response:
-{{
-  "name 1": "2~5 sentences about why this is a good name, based on the information provided by user and based on the meaning of the name.",
-  "name 2": "2~5 sentences about why this is a good name, based on the information provided by user and based on the meaning of the name.",
-  ...
-}}
-'''.format(prompt_beginning=prompt_beginning, user_pref_str=user_pref_str, user_sentiments_str=user_sentiments_str)
-
-
-def create_text_from_user_sentiments(user_sentiments: np.UserSentiments) -> str:
+def create_summary_of_user_sentiments(user_sentiments: UserSentiments) -> str:
     if not user_sentiments:
         return ''
 
     # create the paragraphs for user sentiments
     formatted_prefs = []
 
-    liked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
-                     'Please recommend a few names similar to {name} if possible.'
-    disliked_template = '{meaning}: user {sentiment} the name of {name}{reason_clause}. ' \
-                        'Please do not recommend names similar to {name} if possible.'
-    saved_template = '{meaning}: user {sentiment} the name of {name} as a favorite{reason_clause}. ' \
-                     'Please recommend a few more names similar to {name}.'
+    liked_template = 'User {sentiment} the name of {name}{reason_clause}.'
+    disliked_template = 'User {sentiment} the name of {name}{reason_clause}.'
+    saved_template = 'User {sentiment} the name of {name} as a favorite{reason_clause}.'
+
     for name, sentiment_dict in user_sentiments.get_val().items():
-        if sentiment_dict['sentiment'] == np.Sentiment.LIKED:
+        if sentiment_dict['sentiment'] == Sentiment.LIKED:
             template = liked_template
-        elif sentiment_dict['sentiment'] == np.Sentiment.DISLIKED:
+        elif sentiment_dict['sentiment'] == Sentiment.DISLIKED:
             template = disliked_template
-        elif sentiment_dict['sentiment'] == np.Sentiment.SAVED:
+        elif sentiment_dict['sentiment'] == Sentiment.SAVED:
             template = saved_template
         else:
             raise ValueError('Unexpected sentiment: {}'.format(sentiment_dict['sentiment']))
@@ -82,11 +49,11 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
     formatted_prefs = []
     for pref in user_prefs_dict.values():
         if isinstance(pref, np.Origin):
-            pref_str = '{meaning}: {value}. Please suggest a few names which has the connection with {value}.' \
-                .format(meaning=pref.__class__.get_pref_meaning(), value=pref.get_val_str())
+            pref_str = 'User\' family origin is {value}. Please suggest a few names related to {value}.'\
+                .format(value=pref.get_val_str())
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.OtherPref):
-            pref_str = 'Other info user provided: {value}.'.format(value=pref.get_val())
+            pref_str = 'User also says: {value}.'.format(value=pref.get_val())
             formatted_prefs.append(pref_str)
         elif isinstance(pref, np.StyleChoice) or isinstance(pref, np.MaturityChoice) or \
                 isinstance(pref, np.FormalityChoice) or isinstance(pref, np.ClassChoice) or \
@@ -95,9 +62,13 @@ def create_text_from_user_pref(user_prefs_dict: Dict[str, np.PrefInterface]) -> 
                 isinstance(pref, np.CreativityChoice) or isinstance(pref, np.ComplexityChoice) or \
                 isinstance(pref, np.ToneChoice) or isinstance(pref, np.IntellectualChoice):
             choice = pref.get_val_str()
-            pref_str = '{meaning}: user prefers {choice} names.'.format(
+            pref_str = 'In terms of {meaning}, user prefers {choice} names.'.format(
                 meaning=pref.__class__.get_pref_meaning(), choice=choice)
             formatted_prefs.append(pref_str)
+        else:
+            logging.warning('skip user preference of {type} with value of {value}'.format(
+                type=pref.get_url_param_name(), value=pref.get_val()
+            ))
 
     return '\n'.join(formatted_prefs)
 

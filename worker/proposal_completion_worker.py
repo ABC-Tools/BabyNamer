@@ -16,8 +16,7 @@ import redis.asyncio as redis_async
 import app.lib.redis as redis_lib
 import app.openai_lib.prompt as prompt
 import app.lib.name_pref as np
-import app.lib.origin_and_short_meaning as osm
-import app.lib.name_meaning as nm
+import app.lib.origin_and_meaning as osm
 
 
 tiktoken_encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
@@ -160,7 +159,7 @@ def create_user_description(session_id):
     gender = gender_pref.get_val()
 
     user_pref_str = prompt.create_text_from_user_pref(user_prefs_dict)
-    user_sentiments_str = prompt.create_text_from_user_sentiments(user_sentiments)
+    user_sentiments_str = prompt.create_summary_of_user_sentiments(user_sentiments)
     user_context = '''
 The user provided preference:
 {user_pref_str}
@@ -175,14 +174,13 @@ def create_name_descriptions(gender, proposed_names) -> List[str]:
     # create description of each name
     name_descriptions = []
     for name in proposed_names:
-        origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
+        origin, short_meaning, meaning = osm.ORIGIN_MEANING.get(name, gender)
         if origin or short_meaning:
             os_description = f'origin: {origin}\n short meaning: {short_meaning}'.format(
                 origin=origin, short_meaning=short_meaning
             )
         else:
             os_description = ''
-        overall_description = nm.NAME_MEANING.get(name, gender)
         # rating_description = prompt.create_rating_description(name, gender)
         whole_description = '''
 The description of name "{name}":
@@ -190,7 +188,7 @@ The description of name "{name}":
 {overall_description}
 The end of the description of name "{name}"
         '''.format(name=name, os_description=os_description,
-                   overall_description=overall_description)
+                   overall_description=meaning)
         name_descriptions.append(whole_description)
 
     return name_descriptions

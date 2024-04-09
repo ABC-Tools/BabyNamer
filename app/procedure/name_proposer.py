@@ -7,19 +7,24 @@ from app.lib import name_statistics as ns
 from app.lib import name_pref as np
 from app.lib import embedding_search as es
 from app.lib import name_rating as nr
+from app.lib.name_sentiments import UserSentiments
 
 
 class ProposedNames(object):
 
     def __init__(self,
-                 suggest_names_from_option,
-                 suggested_names_from_siblings,
-                 suggested_names_from_text,
-                 suggested_names_by_popularity):
-        self._suggest_names_from_option = suggest_names_from_option
-        self._suggested_names_from_siblings = suggested_names_from_siblings
-        self._suggested_names_from_text = suggested_names_from_text
-        self._suggested_names_by_popularity = suggested_names_by_popularity
+                 suggest_names_from_option=None,
+                 suggested_names_from_siblings=None,
+                 suggested_names_from_text=None,
+                 suggested_names_by_popularity=None):
+        self._suggest_names_from_option = \
+            suggest_names_from_option if suggest_names_from_option else []
+        self._suggested_names_from_siblings = \
+            suggested_names_from_siblings if suggested_names_from_siblings else []
+        self._suggested_names_from_text = \
+            suggested_names_from_text if suggested_names_from_text else []
+        self._suggested_names_by_popularity = \
+            suggested_names_by_popularity if suggested_names_by_popularity else []
 
     def get_suggest_names_from_option(self):
         return self._suggest_names_from_option
@@ -36,7 +41,7 @@ class ProposedNames(object):
 
 def proposed_names(gender: Gender,
                    user_prefs_dict: Dict[str, np.PrefInterface],
-                   user_sentiments: np.UserSentiments,
+                   user_sentiments: UserSentiments,
                    count=20):
     # User option to get recommendation if there is option input
     suggest_names_from_option = {}
@@ -55,7 +60,7 @@ def proposed_names(gender: Gender,
     # Use text content to get recommendation if there is text input
     suggested_names_from_text = {}
     if has_text_pref(user_prefs_dict, user_sentiments):
-        eb = ec.creat_embedding_from_pref_sentiments(gender, user_prefs_dict, user_sentiments)
+        eb = ec.create_embedding_from_pref_sentiments(gender, user_prefs_dict, user_sentiments)
         suggested_names_from_text = es.FAISS_SEARCH.search_with_embedding(gender, eb, num_of_result=count * 10)
 
     # Recommend names using popularity
@@ -92,7 +97,7 @@ def suggest_name_using_sibling_names(gender: Gender,
 
 
 def has_text_pref(user_prefs_dict: Dict[str, np.PrefInterface],
-                  user_sentiments: np.UserSentiments) -> bool:
+                  user_sentiments: UserSentiments) -> bool:
     """
     Whether user provides preferences which can only be processed using language
     """

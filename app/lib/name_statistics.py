@@ -9,10 +9,10 @@ from .common import Gender, canonicalize_gender, canonicalize_name, get_app_root
 
 class NameStatistics:
 
-    def __init__(self):
+    def __init__(self, start_year=2020, end_year=2022):
         self.__freq__ = NameStatistics.load_file()
         self._name_freq_3_year, self._name_ordered_list_3_year = \
-            NameStatistics.create_name_freq_rank(self.__freq__, 2020, 2022)
+            NameStatistics.create_name_freq_rank(self.__freq__, start_year, end_year)
 
     def guess_gender(self, name: str):
         name = canonicalize_name(name)

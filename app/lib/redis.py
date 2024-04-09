@@ -15,6 +15,7 @@ import redis
 
 from typing import Dict, List
 import app.lib.name_pref as np
+from app.lib.name_sentiments import UserSentiments
 
 LAST_PREF_UPDATE_TS_KEY = 'last_pref_update_ts'
 
@@ -84,7 +85,7 @@ def get_user_sentiments_key(session_id):
     return 'sentiment-{}'.format(session_id)
 
 
-def update_user_sentiments(session_id, name_sentiments: np.UserSentiments):
+def update_user_sentiments(session_id, name_sentiments: UserSentiments):
     """
     Update the user preferences in Redis
     """
@@ -106,7 +107,7 @@ def update_user_sentiments(session_id, name_sentiments: np.UserSentiments):
     return True
 
 
-def get_user_sentiments(session_id: str) -> np.UserSentiments:
+def get_user_sentiments(session_id: str) -> UserSentiments:
     """
     :return: NameSentiments_instance
     """
@@ -120,14 +121,14 @@ def get_user_sentiments(session_id: str) -> np.UserSentiments:
     # Parse and add NameSentiments preference
     raw_user_sentiments = responses[0]
     if not raw_user_sentiments:
-        return np.UserSentiments.create_from_dict({})
+        return UserSentiments.create_from_dict({})
 
     # Parse the dictionary string
     name_sentiments_dict = {}
     for name, dict_str in raw_user_sentiments.items():
         name_sentiments_dict[name] = json.loads(dict_str)
 
-    name_sentiments = np.UserSentiments.create_from_dict(name_sentiments_dict)
+    name_sentiments = UserSentiments.create_from_dict(name_sentiments_dict)
     return name_sentiments
 
 
@@ -144,7 +145,7 @@ def get_sentiment_for_name(session_id: str, name) -> Dict[str, str]:
 Track names displayed to a specific user, so we don't show the same names again
 Use a user-specific sorted set which stores the name displayed before
 """
-MAX_NUM_OF_TRACKED_NAMES = 100
+MAX_NUM_OF_TRACKED_NAMES = 80
 
 
 def get_displayed_names_key(session_id):

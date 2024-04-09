@@ -12,6 +12,7 @@ import app.procedure.name_proposer as n_proposer
 import app.lib.name_pref as np
 from app.lib.common import Gender
 from test.test_lib import get_test_root_dir
+from app.lib.name_sentiments import UserSentiments
 
 
 class TestSuggestNames(unittest.TestCase):
@@ -20,7 +21,7 @@ class TestSuggestNames(unittest.TestCase):
         redis_lib.redis_client = fakeredis.FakeRedis(charset="utf-8", decode_responses=True)
 
     def test_suggest_names_no_pref(self):
-        names = sn.suggest('12345', Gender.BOY)
+        names = sn.suggest_names_using_facts('12345', Gender.BOY)
         self.assertTrue(names[0] == 'Liam', names)
         self.assertTrue(names[1] == 'Noah', names)
 
@@ -32,7 +33,7 @@ class TestSuggestNames(unittest.TestCase):
         sibling_name_pref = np.SiblingNames.create('["Kaitlyn", "Kayden"]')
         redis_lib.update_user_pref('112233', {np.SiblingNames.get_url_param_name(): sibling_name_pref})
 
-        names = sn.suggest('112233', Gender.BOY)
+        names = sn.suggest_names_using_facts('112233', Gender.BOY)
         self.assertTrue('Liam' in names)
         self.assertTrue('Kaden' in names)
 
@@ -49,7 +50,7 @@ class TestSuggestNames(unittest.TestCase):
                                    {np.StyleChoice.get_url_param_name(): style,
                                     np.TextureChoice.get_url_param_name(): texture})
 
-        names = sn.suggest('654321', Gender.BOY, count=10)
+        names = sn.suggest_names_using_facts('654321', Gender.BOY, count=10)
         self.assertTrue('Liam' in names)
         self.assertTrue('Ragnar' in names)
 
@@ -64,7 +65,7 @@ class TestSuggestNames(unittest.TestCase):
                                     np.TextureChoice.get_url_param_name(): texture,
                                     np.SiblingNames.get_url_param_name(): sibling_name})
 
-        names = sn.suggest('654321', Gender.BOY, count=10)
+        names = sn.suggest_names_using_facts('654321', Gender.BOY, count=10)
         self.assertTrue('Liam' not in names)
         self.assertTrue('Ragnar' in names)
 
@@ -84,7 +85,7 @@ class TestSuggestNames(unittest.TestCase):
                                     np.SiblingNames.get_url_param_name(): sibling_name})
         redis_lib.append_displayed_names('654321', ['Ragnar', 'William'])
 
-        names = sn.suggest('654321', Gender.BOY, filter_displayed_names=True, count=10)
+        names = sn.suggest_names_using_facts('654321', Gender.BOY, filter_displayed_names=True, count=10)
         self.assertTrue('Liam' not in names)
         self.assertTrue('Ragnar' not in names)
         self.assertTrue('Joab' in names)
@@ -112,7 +113,7 @@ class TestSuggestNames(unittest.TestCase):
             other_pref = np.OtherPref.create('I like France')
             redis_lib.update_user_pref('67890', {np.OtherPref.get_url_param_name(): other_pref})
 
-            sentiments = np.UserSentiments.create(
+            sentiments = UserSentiments.create(
                 json.dumps(
                     {
                         "Aron": {"sentiment": "liked", "reason": "sounds good"},
@@ -123,7 +124,7 @@ class TestSuggestNames(unittest.TestCase):
             )
             redis_lib.update_user_sentiments('67890', sentiments)
 
-            names = sn.suggest('67890', Gender.BOY)
+            names = sn.suggest_names_using_facts('67890', Gender.BOY)
             args, kwargs = with_options_mock.embeddings.create.call_args
             self.assertTrue('I like France' in kwargs['input'][0],
                             'could not locate the info provide by user: "{}" in prompt: {}'.
@@ -164,7 +165,7 @@ class TestSuggestNames(unittest.TestCase):
                                        {np.OtherPref.get_url_param_name(): other_pref,
                                         np.SiblingNames.get_url_param_name(): sibling_pref})
 
-            sentiments = np.UserSentiments.create(
+            sentiments = UserSentiments.create(
                 json.dumps(
                     {
                         "Liam": {"sentiment": "liked", "reason": "sounds good"},
@@ -175,7 +176,7 @@ class TestSuggestNames(unittest.TestCase):
             )
             redis_lib.update_user_sentiments('67891', sentiments)
 
-            names = sn.suggest('67891', Gender.BOY)
+            names = sn.suggest_names_using_facts('67891', Gender.BOY)
             print('Suggested names: {}'.format(names))
 
             self.assertTrue('Liam' not in names)

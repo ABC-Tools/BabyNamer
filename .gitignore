@@ -3,6 +3,9 @@
 # big files
 name_embedding*.txt
 
+# temporary files
+tools/tmp/
+
 .idea/
 
 # Byte-compiled / optimized / DLL files

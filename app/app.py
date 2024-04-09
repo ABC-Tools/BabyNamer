@@ -12,13 +12,14 @@ from flask_sock import Sock
 from flask import request, abort, jsonify, g
 
 import app.lib.redis as redis_lib
+from app.lib.name_sentiments import UserSentiments
+from app.lib import name_sentiments as sentiments
 from app.openai_lib.assistant import Assistant
 from app.lib import name_statistics as ns
-from app.lib import name_meaning as nm
 from app.lib import similar_names as sn
 from app.lib import name_pref as np
 from app.lib import session_id as sid
-from app.lib import origin_and_short_meaning as osm
+from app.lib import origin_and_meaning as osm
 from app.lib.common import canonicalize_gender, canonicalize_name
 from app.lib import name_rating as nr
 
@@ -115,9 +116,8 @@ def get_name_facts():
 
     logging.info('[data] user {} request names facts for {}'.format(session_id, name))
 
-    origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
+    origin, short_meaning, meaning = osm.ORIGIN_MEANING.get(name, gender)
     trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
-    meaning = nm.NAME_MEANING.get(name, gender)
     similar_names = sn.SIMILAR_NAMES.get(name, gender)
 
     output = {
@@ -137,7 +137,7 @@ def get_name_facts():
     # get sentiment if there is any
     sentiment_dict = redis_lib.get_sentiment_for_name(session_id, name)
     if sentiment_dict:
-        output[np.UserSentiments.get_url_param_name()] = sentiment_dict
+        output[UserSentiments.get_url_param_name()] = sentiment_dict
 
     _, rank = ns.NAME_STATISTICS.get_frequency_and_rank(name, gender)
     if rank < 100000:
@@ -313,7 +313,7 @@ def update_user_sentiments(func_call=False):
     if not session_id or not sid.verify_session_id(session_id):
         abort(400, "missing or invalid session id: {}".format(session_id))
 
-    sentiments_str = request.args.get(np.UserSentiments.get_url_param_name(), default="", type=str)
+    sentiments_str = request.args.get(UserSentiments.get_url_param_name(), default="", type=str)
     if not sentiments_str:
         if func_call:
             return json.dumps({"msg": "success; no-op"})
@@ -321,7 +321,7 @@ def update_user_sentiments(func_call=False):
             abort(400, "missing user sentiments in request")
 
     logging.info('[data] sentiments from session {}: {}'.format(session_id, sentiments_str))
-    sentiments_inst = np.UserSentiments.create(sentiments_str)
+    sentiments_inst = UserSentiments.create(sentiments_str)
     redis_lib.update_user_sentiments(session_id, sentiments_inst)
 
     resp = {"msg": "success"}
@@ -365,7 +365,7 @@ def get_name_sentiments():
     if not name_sentiments:
         return {}
 
-    name_sentiments_by_sentiments = np.name_sentiments_by_sentiments(name_sentiments)
+    name_sentiments_by_sentiments = sentiments.name_sentiments_by_sentiments(name_sentiments)
     return jsonify(name_sentiments_by_sentiments)
 
 

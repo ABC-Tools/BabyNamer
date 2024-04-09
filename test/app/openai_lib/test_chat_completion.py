@@ -1,5 +1,6 @@
 import unittest
 
+from app.lib.name_sentiments import UserSentiments
 from app.openai_lib import chat_completion as cc
 from app.lib import name_pref as np
 
@@ -18,7 +19,7 @@ class TestChatCompletion(unittest.TestCase):
                 "reason": "Please suggest name starting with letter M"
             }
         }
-        sentiments = np.UserSentiments.create_from_dict(sentiments_dict)
+        sentiments = UserSentiments.create_from_dict(sentiments_dict)
 
         result = cc.check_proposed_names(
             ["Ethan", "Madison", "Maxwell", "Max"],

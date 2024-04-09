@@ -1,7 +1,6 @@
-from typing import Any, List, Dict, Union
+from typing import List, Dict, Union, Set
 
 import json
-from enum import Enum
 from .common import Gender, canonicalize_gender, canonicalize_name
 import app.lib.name_rating as nr
 
@@ -534,102 +533,6 @@ class IntellectualChoice(RatingPref):
         return IntellectualChoice(choice)
 
 
-class Sentiment(Enum):
-    LIKED = 1
-    DISLIKED = 2
-    SAVED = 3
-
-    def __str__(self):
-        return f'{self.name}'.lower()
-
-    @staticmethod
-    def create(s: str):
-        if not s:
-            return None
-
-        if s.lower() in ['liked']:
-            return Sentiment.LIKED
-        elif s.lower() in ['disliked']:
-            return Sentiment.DISLIKED
-        elif s.lower() in ['saved']:
-            return Sentiment.SAVED
-        else:
-            raise ValueError('Invalid sentiment type; allow only "Liked/Disliked"; got {}'.format(s))
-
-
-class UserSentiments(PrefInterface):
-    def __init__(self, names_sentiments: Dict[str, Dict[str, Any]]):
-        self._names_sentiments = names_sentiments
-
-    @staticmethod
-    def get_url_param_name():
-        return 'name_sentiments'
-
-    @staticmethod
-    def get_pref_meaning():
-        return 'name sentiments'
-
-    def get_val(self):
-        """
-        :return: a dictionary like {
-            'George': {
-                "sentiment": Sentiment.LIKED/DISLIKED/SAVED,
-                "reason": "..."   <-- optional
-            }
-        }
-        """
-        return self._names_sentiments
-
-    def get_native_val(self):
-        """
-        :return: a dictionary like {
-            'George': {
-                "sentiment": 'liked/disliked/saved',
-                "reason": "..."   <-- optional
-            }
-        }
-        """
-        result = {}
-        for name, enum_dict in self._names_sentiments.items():
-            result[name] = enum_dict.copy()
-            result[name]['sentiment'] = str(result[name]['sentiment'])
-
-        return result
-
-    def get_val_str(self) -> str:
-        return json.dumps(self._names_sentiments)
-
-    @staticmethod
-    def create_from_dict(raw_names_sentiments: Dict[str, Dict[str, str]]):
-        """
-        create from dictionary by canonicalizing name and converting sentiment to enum
-        """
-        names_sentiments = {}
-        for name, sentiment_dict in raw_names_sentiments.items():
-            if 'sentiment' not in sentiment_dict or not sentiment_dict['sentiment']:
-                raise ValueError('Invalid name sentiment: {}'.format(json.dumps(sentiment_dict)))
-
-            name = canonicalize_name(name)
-            names_sentiments[name] = {
-                'sentiment': Sentiment.create(sentiment_dict['sentiment'])
-            }
-            if 'reason' in sentiment_dict:
-                names_sentiments[name]['reason'] = sentiment_dict['reason']
-
-        return UserSentiments(names_sentiments)
-
-    @staticmethod
-    def create(names_sentiment_str: str):
-        if not names_sentiment_str:
-            return None
-
-        raw_names_sentiments = json.loads(names_sentiment_str)
-        if not raw_names_sentiments:
-            return None
-
-        return UserSentiments.create_from_dict(raw_names_sentiments)
-
-
 class OtherPref(StringPref):
     @staticmethod
     def get_url_param_name():
@@ -709,58 +612,6 @@ def class_dict_to_native_dict(class_dict: Dict[str, PrefInterface]) -> Dict[str,
     return result
 
 
-def name_sentiments_by_sentiments(name_sentiments: UserSentiments) -> Dict[str, List[Dict[str, str]]]:
-    """
-    :return: a dictionary like
-    {
-        "liked": [
-            {
-                "name": "George",
-                "reason": "blah"
-            },
-            {
-                "name": "Mike",
-                "reason": "what..."
-            }
-        ],
-        "disliked": [
-            {
-                "name": "Kayden",
-                "reason": "blah"
-            },
-            {
-                "name": "Allen",
-                "reason": "what..."
-            }
-        ]
-    }
-    """
-    result = {
-        "liked": [],
-        "disliked": [],
-        "saved": []
-    }
-
-    for name, val_dict in name_sentiments.get_val().items():
-        if val_dict['sentiment'] == Sentiment.LIKED:
-            tmp_dict = {'name': name}
-            if "reason" in val_dict:
-                tmp_dict["reason"] = val_dict["reason"]
-            result['liked'].append(tmp_dict)
-        elif val_dict['sentiment'] == Sentiment.DISLIKED:
-            tmp_dict = {'name': name}
-            if "reason" in val_dict:
-                tmp_dict["reason"] = val_dict["reason"]
-            result['disliked'].append(tmp_dict)
-        else:
-            tmp_dict = {'name': name}
-            if "reason" in val_dict:
-                tmp_dict["reason"] = val_dict["reason"]
-            result['saved'].append(tmp_dict)
-
-    return result
-
-
 def get_option_pref(user_prefs_dict: Dict[str, PrefInterface]) -> Dict[str, PrefInterface]:
     option_pref_url_params = [x.get_url_param_name() for x in OPTION_PREFS]
 
@@ -780,15 +631,17 @@ def get_sibling_name_pref(user_prefs_dict: Dict[str, PrefInterface]):
     return None
 
 
-def get_name_pref(user_prefs_dict: Dict[str, PrefInterface]) -> List[PrefInterface]:
-    name_pref_url_params = [x.get_url_param_name() for x in NAME_PREFS]
+def get_filter_names_from_pref(name_prefs: Dict[str, PrefInterface]) -> Set[str]:
+    names_to_avoid = set()
+    for _, pref in name_prefs.items():
+        if isinstance(pref, MotherName) or isinstance(pref, FatherName):
+            names_to_avoid.add(pref.get_val())
+        elif isinstance(pref, SiblingNames):
+            names_to_avoid.update(pref.get_val())
+        elif isinstance(pref, NamesToAvoid):
+            names_to_avoid.update(pref.get_val())
 
-    result = []
-    for present_pref_key, pref_inst in user_prefs_dict.items():
-        if present_pref_key in name_pref_url_params:
-            result.append(pref_inst)
-
-    return result
+    return names_to_avoid
 
 
 ALL_PREFERENCES = [GenderPref, FamilyName, MotherName, FatherName, SiblingNames,
