@@ -6,7 +6,7 @@ import numpy as np
 import app.lib.embedding_search as es
 from app.lib.common import Gender
 from test.test_lib import get_test_root_dir
-import app.lib.name_meaning as nm
+import app.lib.origin_and_meaning as oam
 
 
 class TestFaissSearch(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestFaissSearch(unittest.TestCase):
                         'The cosine similarity score is less than 0.6: {}'.format(result))
 
         first_key = next(iter(result.keys()))
-        description = nm.NAME_MEANING.get(first_key, 'boy')
+        _, _, description = oam.ORIGIN_MEANING.get(first_key, 'boy')
         # print('description: {}'.format(description))
         self.assertTrue('France' in description or 'French' in description,
                         'The description has no keyword of either France or French: {}'.format(description))

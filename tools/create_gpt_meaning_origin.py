@@ -19,8 +19,7 @@ def get_names_without_meaning_origin():
             return json.load(fp)
 
     import app.lib.name_statistics as ns
-    import app.lib.name_meaning as nm
-    import app.lib.origin_and_short_meaning as osm
+    import app.lib.origin_and_meaning as osm
 
     result = {
         str(Gender.BOY): [],
@@ -29,8 +28,7 @@ def get_names_without_meaning_origin():
 
     for gender in [Gender.BOY, Gender.GIRL]:
         for name in ns.NAME_STATISTICS.get_popular_names(gender, count=8000):
-            meaning = nm.NAME_MEANING.get(name, gender).strip()
-            origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
+            origin, short_meaning, meaning = osm.ORIGIN_MEANING.get(name, gender)
             origin = origin.strip()
             short_meaning = short_meaning.strip()
             if not meaning or not origin or not short_meaning:
@@ -251,21 +249,13 @@ def merge_results(write=False):
     merged_result = get_fetched_names_meaning_origin()
     manual_overwrite = get_manual_overwrite()
 
-    import app.lib.name_meaning as nm
-    import app.lib.origin_and_short_meaning as osm
+    import app.lib.origin_and_meaning as osm
 
     for gender in [Gender.BOY, Gender.GIRL]:
         gender_merged_result = merged_result[str(gender)]
 
-        # merge meaning
-        for name, description in nm.NAME_MEANING.__name_meaning__[gender].items():
-            if description:
-                if name not in gender_merged_result:
-                    gender_merged_result[name] = {}
-                gender_merged_result[name]["meaning"] = description
-
         # merge short meaning and origin
-        for name, origin_sm in osm.ORIGIN_SHORT_MEANING.__osm__[gender].items():
+        for name, origin_sm in osm.ORIGIN_MEANING.__osm__[gender].items():
             origin = origin_sm.get('origin', '')
             if origin:
                 if name not in gender_merged_result:
@@ -276,6 +266,11 @@ def merge_results(write=False):
                 if name not in gender_merged_result:
                     gender_merged_result[name] = {}
                 gender_merged_result[name]["short_meaning"] = short_meaning
+            meaning = origin_sm.get('meaning', '')
+            if meaning:
+                if name not in gender_merged_result:
+                    gender_merged_result[name] = {}
+                gender_merged_result[name]["meaning"] = meaning
 
         # merge manual overwrite
         for name, values in manual_overwrite[str(gender)].items():

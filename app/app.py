@@ -16,11 +16,10 @@ from app.lib.name_sentiments import UserSentiments
 from app.lib import name_sentiments as sentiments
 from app.openai_lib.assistant import Assistant
 from app.lib import name_statistics as ns
-from app.lib import name_meaning as nm
 from app.lib import similar_names as sn
 from app.lib import name_pref as np
 from app.lib import session_id as sid
-from app.lib import origin_and_short_meaning as osm
+from app.lib import origin_and_meaning as osm
 from app.lib.common import canonicalize_gender, canonicalize_name
 from app.lib import name_rating as nr
 
@@ -117,9 +116,8 @@ def get_name_facts():
 
     logging.info('[data] user {} request names facts for {}'.format(session_id, name))
 
-    origin, short_meaning = osm.ORIGIN_SHORT_MEANING.get(name, gender)
+    origin, short_meaning, meaning = osm.ORIGIN_MEANING.get(name, gender)
     trend = ns.NAME_STATISTICS.get_yearly_trend(name, gender)
-    meaning = nm.NAME_MEANING.get(name, gender)
     similar_names = sn.SIMILAR_NAMES.get(name, gender)
 
     output = {
