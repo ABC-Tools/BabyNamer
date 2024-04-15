@@ -45,7 +45,7 @@ class SimilarNames:
 
     @staticmethod
     def get_source_file():
-        return os.path.join(get_app_root_dir(), 'data', 'similar_names_from_embedding.json')
+        return os.path.join(get_app_root_dir(), 'data', 'similar_names_04_13.json')
 
 
 SIMILAR_NAMES = SimilarNames()
