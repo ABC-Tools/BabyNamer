@@ -81,8 +81,20 @@ def get_user_pref(session_id: str):
     return all_prefs
 
 
-def get_user_sentiments_key(session_id):
+"""
+Two data structures to maintain the sentiments
+1. a hash map, with name as column key and a string of dictionary (including sentiment and also the reason/comment).
+2. a sorted set to track the time when the name sentiment was added. This is used to prevent sending too much comment
+   to chatgpt
+"""
+
+
+def get_user_sentiments_hash_key(session_id):
     return 'sentiment-{}'.format(session_id)
+
+
+def get_user_sentiments_sset_key(session_id):
+    return 'sentiment-sset-{}'.format(session_id)
 
 
 def update_user_sentiments(session_id, name_sentiments: UserSentiments):
@@ -92,30 +104,38 @@ def update_user_sentiments(session_id, name_sentiments: UserSentiments):
     if not name_sentiments:
         return True
 
-    name_sentiments_key = get_user_sentiments_key(session_id)
     # Collapse the second level dictionary into string, such that we can write it into redis
+    cur_ts = int(time.time())
     name_sentiments_str = {}
+    name_ts = {}
     for name, sentiments_dict in name_sentiments.get_native_val().items():
         name_sentiments_str[name] = json.dumps(sentiments_dict)
+        name_ts[name] = cur_ts
 
     pipeline = redis_client.pipeline()
+
+    name_sentiments_key = get_user_sentiments_hash_key(session_id)
     pipeline.hset(name_sentiments_key, mapping=name_sentiments_str)
-    # Add expiration the last update time
-    pipeline.zadd(LAST_PREF_UPDATE_TS_KEY, mapping={session_id: int(time.time())})
+
+    user_sentiments_sset_key = get_user_sentiments_sset_key(session_id)
+    pipeline.zadd(user_sentiments_sset_key, name_ts)
+    logging.debug(f'sorted set: {name_ts}')
+
     pipeline.execute()
 
     return True
 
 
-def get_user_sentiments(session_id: str) -> UserSentiments:
+def get_user_sentiments(session_id: str, max_count: int = 20) -> UserSentiments:
     """
     :return: NameSentiments_instance
     """
     # fetch preferences
     pipeline = redis_client.pipeline()
-    user_sentiments_key = get_user_sentiments_key(session_id)
+    user_sentiments_key = get_user_sentiments_hash_key(session_id)
     pipeline.hgetall(user_sentiments_key)
-
+    user_sentiments_sset_key = get_user_sentiments_sset_key(session_id)
+    pipeline.zrevrange(user_sentiments_sset_key, 0, max_count - 1)
     responses = pipeline.execute()
 
     # Parse and add NameSentiments preference
@@ -123,9 +143,16 @@ def get_user_sentiments(session_id: str) -> UserSentiments:
     if not raw_user_sentiments:
         return UserSentiments.create_from_dict({})
 
+    # Get the list of the latest names
+    latest_names = responses[1]
+    logging.debug(f'latest names from sorted set: {latest_names}')
+
     # Parse the dictionary string
     name_sentiments_dict = {}
     for name, dict_str in raw_user_sentiments.items():
+        if name not in latest_names:
+            continue
+
         name_sentiments_dict[name] = json.loads(dict_str)
 
     name_sentiments = UserSentiments.create_from_dict(name_sentiments_dict)
@@ -133,7 +160,7 @@ def get_user_sentiments(session_id: str) -> UserSentiments:
 
 
 def get_sentiment_for_name(session_id: str, name) -> Dict[str, str]:
-    user_sentiments_key = get_user_sentiments_key(session_id)
+    user_sentiments_key = get_user_sentiments_hash_key(session_id)
     sentiment_str = redis_client.hget(user_sentiments_key, name)
     if not sentiment_str:
         return {}
