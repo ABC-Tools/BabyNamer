@@ -4,7 +4,7 @@ import os
 import time
 
 API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key='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')
+client = openai.OpenAI(api_key='')
 
 
 class TimeoutException(openai.Timeout):
