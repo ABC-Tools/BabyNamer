@@ -11,7 +11,7 @@ import app.openai_lib.prompt as prompt
 from app.lib.common import Gender
 
 API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key='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')
+client = openai.OpenAI(api_key='')
 
 
 class InvalidResponse(json.decoder.JSONDecodeError):
