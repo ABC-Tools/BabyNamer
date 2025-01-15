@@ -9,7 +9,7 @@ import app.openai_lib.prompt as prompt
 import app.lib.name_pref as np
 from app.lib.name_sentiments import UserSentiments
 
-client = openai.OpenAI(api_key='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')
+client = openai.OpenAI(api_key='')
 
 
 def create_single_embedding(msg: str):
