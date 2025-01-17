@@ -1,4 +1,5 @@
 # AI Baby Namer
+![al text](https://github.com/ABC-Tools/BabyNamer/blob/master/app/static/images/app_screenshot.png)
 
 ## Goal
 Baby namer is a kind of application which help parents to name newborns. The baby namers on the market ask parents to choose preferences through a bunch of predefined dropdowns or checkboxes, then use those preferences to recommend names for newborns.
