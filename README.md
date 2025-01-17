@@ -35,7 +35,7 @@ flowchart LR
     D --> E[users]
 ```
 
-The web scraping code lives in (web_scraper repo)[https://github.com/ABC-Tools/web_scraper]; and this repo contains yellow portion of above diagram.
+The web scraping code lives in [web_scraper repo](https://github.com/ABC-Tools/web_scraper); and this repo contains yellow portion of above diagram.
 
 ## The RAG (Retrieval-Augmented Generation)
 The RAG is a search database, with
@@ -43,8 +43,8 @@ The RAG is a search database, with
 - __output__: a list of potentially related names
 
 Before that, we need to convert the meaning of all names into embedding, by the following steps:
-1. cleanse the name informations
-2. construct a paragraph of text using name informations
+1. cleanse the name information
+2. construct a paragraph of text using name information
 3. call OpenAI's `text-embedding-ada-002` model to create embeddings
 
 To serve the embeddings, we chose Meta's [FAISS](https://github.com/facebookresearch/faiss). There are other choices of vector database, but I want to keep our solution simple. FAISS is a library, which I can load inside the web server.
