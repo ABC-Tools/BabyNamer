@@ -1,4 +1,6 @@
 # AI Baby Namer
+Available at [App Store](https://apps.apple.com/cz/app/ai-baby-namer/id6479219012)
+
 ![al text](https://github.com/ABC-Tools/BabyNamer/blob/master/app/static/images/app_screenshot.png)
 
 ## Goal
